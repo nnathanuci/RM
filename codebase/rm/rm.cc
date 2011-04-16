@@ -34,3 +34,8 @@ RC getAttributes(const string tableName, vector<Attribute> &attrs)
     return 1;
 }
 
+RC foo(const string &t)
+{
+  cout << t;
+  return 0;
+}
