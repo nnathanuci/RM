@@ -10,6 +10,7 @@
 #define ATTR_INT_SIZE 4
 #define ATTR_REAL_SIZE 4
 
+// XXX: toggle when complete
 //#define ZERO_ASSERT(x) assert((x) == 0)
 //#define NONZERO_ASSERT(x) assert((x) != 0)
 
