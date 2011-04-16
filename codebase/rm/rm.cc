@@ -19,3 +19,18 @@ RM::~RM()
 {
 }
 
+RC createTable(const string tableName, const vector<Attribute> &attrs)
+{
+    return 1;
+}
+
+RC deleteTable(const string tableName)
+{
+    return 1;
+}
+
+RC getAttributes(const string tableName, vector<Attribute> &attrs)
+{
+    return 1;
+}
+
