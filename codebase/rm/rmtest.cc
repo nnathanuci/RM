@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <cassert>
+#include <sstream>
 
 #include "rm.h"
 
@@ -8,12 +9,42 @@
 #define ATTR_INT_SIZE 4
 #define ATTR_REAL_SIZE 4
 
-#define ZERO_ASSERT(x) assert((x) == 0)
-#define NONZERO_ASSERT(x) assert((x) != 0)
+//#define ZERO_ASSERT(x) assert((x) == 0)
+//#define NONZERO_ASSERT(x) assert((x) != 0)
+
+#define ZERO_ASSERT(x) ((x) == 0);
+#define NONZERO_ASSERT(x) ((x) == 1);
 
 using namespace std;
 
-unsigned int compute_schema_size(vector<Attribute> &attrs)
+string output_schema(string table_name, vector<Attribute> &attrs) // {{{
+{
+    stringstream ss;
+    ss << table_name;
+
+    for (unsigned int i = 0; i < attrs.size(); i++)
+    {
+        ss << " " << attrs[i].name << ":";
+        switch (attrs[i].type)
+        { 
+            case TypeInt:
+                 ss << "Int";
+                 break;
+
+            case TypeReal:
+                 ss << "Real";
+                 break;
+
+            case TypeVarChar:
+                 ss << "VarChar(" << attrs[i].length << ")";
+                 break;
+        }
+    }
+
+    return ss.str();
+} // }}}
+
+unsigned int compute_schema_size(vector<Attribute> &attrs) // {{{
 {
     unsigned int size = 1;
 
@@ -28,9 +59,9 @@ unsigned int compute_schema_size(vector<Attribute> &attrs)
 
     size += attrs.size() * 2; /* field offset is 2 bytes, XXX: magic constant. */
 
-    for(int i = 0; i < attrs.size(); i++)
+    for (unsigned int i = 0; i < attrs.size(); i++)
     {
-        switch(attrs[i].type)
+        switch (attrs[i].type)
         { 
             case TypeInt:
             case TypeReal:
@@ -44,35 +75,17 @@ unsigned int compute_schema_size(vector<Attribute> &attrs)
     }
 
     return size;
-}
+} // }}}
 
-void rmTest_SystemCatalog() // {{{
+void rmTest_SystemCatalog(RM *rm) // {{{
 {
-    const char *t1 = "table1";
+    string t1 = "t1";
     vector<Attribute> t1_attrs;
-
-    const char *t2 = "table2";
-    vector<Attribute> t2_attrs;
-
-    const char *t3 = "table3";
-    vector<Attribute> t3_attrs;
-
-    const char *t4 = "table4";
-    vector<Attribute> t4_attrs;
-
-    t1_attrs.push_back((struct Attribute) { "test", TypeInt, 0 });
-
-    t2_attrs.push_back((struct Attribute) { "test", TypeInt, 0 });
-    t2_attrs.push_back((struct Attribute) { "test1", TypeReal, 0 });
-    t2_attrs.push_back((struct Attribute) { "test2", TypeVarChar, 500 });
-    t2_attrs.push_back((struct Attribute) { "test3", TypeVarChar, 1 });
-
-    cout << "sizeof(t1_attrs) == " << compute_schema_size(t1_attrs) << endl;
-    cout << "sizeof(t2_attrs) == " << compute_schema_size(t2_attrs) << endl;
-
-    /* Structure of record: 1 byte for #fields, 2 bytes for field offset. */
+    t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
 
     /*
+        [Structure of record: 1 byte for #fields, 2 bytes for field offset]
+
         Test cases for:
          RC createTable(const string tableName, const vector<Attribute> &attrs);
          RC deleteTable(const string tableName);
@@ -91,9 +104,17 @@ void rmTest_SystemCatalog() // {{{
     */
     
     /* duplicate table test. */
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    //NONZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    //cout << "PASS: createTable(" << t1; OUTPUT_SCHEMA(t1_attrs); cout << ") [error]" << endl;
+    //NONZERO_ASSERT(pf->CreateTable(fn));
+    //cout << "PASS: create file (already exists) [expecting error]" << endl;
+
     /* duplicate table destroy test. */
     /* invalid table name destroy test. */
     /* correct attribute retrieval test. */
+    /* empty schema. */
     /* schema size tests */
     
 } // }}}
@@ -103,7 +124,7 @@ void rmTest()
     RM *rm = RM::Instance();
 
     // write your own testing cases here
-    rmTest_SystemCatalog();
+    rmTest_SystemCatalog(rm);
 }
 
 int main() 
