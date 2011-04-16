@@ -85,6 +85,17 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     vector<Attribute> t1_attrs;
     t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
 
+    string t2 = "t2";
+    vector<Attribute> t2_attrs;
+    t2_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
+    /* invalid in table namespace */
+    string t_invalid_name1 = "invalid.table/name";
+    string t_invalid_name2 = "invalid.table.name";
+    string t_invalid_name3 = "invalid/table.name";
+    vector<Attribute> t_invalid_attrs;
+    t_invalid_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
     /*
         [Structure of record: 1 byte for #fields, 2 bytes for field offset]
 
@@ -113,7 +124,26 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [duplicate]" << endl;
 
     /* duplicate table destroy test. */
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+
+    NONZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ") [doesnt exist]" << endl;
+
     /* invalid table name destroy test. */
+    NONZERO_ASSERT(rm->deleteTable(t2));
+    cout << "PASS: deleteTable(" << t2 << ") [doesnt exist]" << endl;
+
+    /* invalid table in namespace */
+    NONZERO_ASSERT(rm->createTable(t_invalid_name1, t_invalid_attrs));
+    cout << "PASS: createTable(" << output_schema(t_invalid_name1, t_invalid_attrs) << ") [bad name]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_invalid_name2, t_invalid_attrs));
+    cout << "PASS: createTable(" << output_schema(t_invalid_name2, t_invalid_attrs) << ") [bad name]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_invalid_name3, t_invalid_attrs));
+    cout << "PASS: createTable(" << output_schema(t_invalid_name3, t_invalid_attrs) << ") [bad name]" << endl;
+
     /* correct attribute retrieval test. */
     /* empty schema. */
     /* schema size tests */
