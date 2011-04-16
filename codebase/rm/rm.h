@@ -106,7 +106,6 @@ public:
       const vector<string> &attributeNames, // a list of projected attributes
       RM_ScanIterator &rm_ScanIterator);
 
-  RC foo(const string &t);
 // Extra credit
 public:
   RC dropAttribute(const string tableName, const string attributeName);

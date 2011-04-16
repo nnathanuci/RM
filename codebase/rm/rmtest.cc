@@ -105,14 +105,11 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     */
     
     /* duplicate table test. */
-    //ZERO_ASSERT(rm->createTable((const string) t1, (const vector<Attribute>) t1_attrs));
-    ZERO_ASSERT(rm->foo(t1)); cout << endl;
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
 
-    //NONZERO_ASSERT(rm->createTable(t1, t1_attrs));
-    //cout << "PASS: createTable(" << t1; OUTPUT_SCHEMA(t1_attrs); cout << ") [error]" << endl;
-    //NONZERO_ASSERT(pf->CreateTable(fn));
-    //cout << "PASS: create file (already exists) [expecting error]" << endl;
+    NONZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [duplicate]" << endl;
 
     /* duplicate table destroy test. */
     /* invalid table name destroy test. */
