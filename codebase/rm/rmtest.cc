@@ -90,7 +90,11 @@ void rmTest_SystemCatalog() // {{{
          };
     */
     
-    
+    /* duplicate table test. */
+    /* duplicate table destroy test. */
+    /* invalid table name destroy test. */
+    /* correct attribute retrieval test. */
+    /* schema size tests */
     
 } // }}}
 
