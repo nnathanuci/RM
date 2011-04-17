@@ -1,6 +1,13 @@
 
 #include "rm.h"
 
+bool operator==(const Attribute &lhs, const Attribute &rhs);
+{
+    return ((lhs.name == rhs.name) &&
+            (lhs.type == rhs.type) &&
+            (lhs.length == rhs.length));
+}
+
 RM* RM::_rm = 0;
 
 RM* RM::Instance()
