@@ -111,12 +111,31 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     t2_attrs.push_back((struct Attribute) { "a2", TypeReal, 0 });
     t2_attrs.push_back((struct Attribute) { "a3", TypeVarChar, 500 });
 
+
     /* invalid in table namespace */
     string t_invalid_name1 = "invalid.table/name";
     string t_invalid_name2 = "invalid.table.name";
     string t_invalid_name3 = "invalid/table.name";
     vector<Attribute> t_invalid_attrs;
     t_invalid_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
+    /* empty schema. */
+    string t_empty = "t_empty";
+    vector<Attribute> t_empty_attrs;
+
+    string t_overflow1 = "t_overflow1";
+    vector<Attribute> t_overflow1_attrs;
+    t_overflow1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4094 });
+
+    string t_overflow2 = "t_overflow2";
+    vector<Attribute> t_overflow2_attrs;
+    /* 1365 + 1365*2 + 1 = 4096. */
+    for (int i = 0; i < 1366; i++)
+    {
+        stringstream ss;
+        ss << "a" << i;
+        t_overflow2_attrs.push_back((struct Attribute) { ss.str(), TypeVarChar, 1 });
+    }
 
     vector<Attribute> aux_attrs;
 
@@ -184,7 +203,16 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
   
     /* empty schema. */
+    cout << "[ empty schema test. ]" << endl;
+    NONZERO_ASSERT(rm->createTable(t_empty, t_empty_attrs));
+    cout << "PASS: createTable(" << output_schema(t_empty, t_empty_attrs) << ") [no schema]" << endl;
+
     /* schema size tests */
+    cout << "[ schema size tests ]" << endl;
+    NONZERO_ASSERT(rm->createTable(t_overflow1, t_overflow1_attrs));
+    cout << "PASS: createTable(" << output_schema(t_overflow1, t_overflow1_attrs) << ") [overflow]" << endl;
+    NONZERO_ASSERT(rm->createTable(t_overflow2, t_overflow2_attrs));
+    cout << "PASS: createTable(" << output_schema(t_overflow2, t_overflow2_attrs).substr(0, 60)+"..." << ") [overflow]" << endl;
     
 } // }}}
 
