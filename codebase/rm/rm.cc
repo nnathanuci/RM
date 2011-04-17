@@ -1,12 +1,5 @@
 #include "rm.h"
 
-bool operator==(const Attribute &lhs, const Attribute &rhs)
-{
-    return ((lhs.name == rhs.name) &&
-            (lhs.type == rhs.type) &&
-            (lhs.length == rhs.length));
-}
-
 RM* RM::_rm = 0;
 
 RM* RM::Instance()
@@ -37,5 +30,9 @@ RC RM::deleteTable(const string tableName)
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
 {
+    attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+    attrs.push_back((struct Attribute) { "a2", TypeReal, 0 });
+    attrs.push_back((struct Attribute) { "a3", TypeVarChar, 500 });
+
     return 1;
 }
