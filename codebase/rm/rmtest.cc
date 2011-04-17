@@ -19,7 +19,7 @@
 
 using namespace std;
 
-bool cmp_attrs(const vector<Attribute> &lhs, const vector<Attribute> &rhs)
+bool cmp_attrs(const vector<Attribute> &lhs, const vector<Attribute> &rhs) // {{{
 {
     if(lhs.size() != rhs.size())
         return false;
@@ -37,7 +37,7 @@ bool cmp_attrs(const vector<Attribute> &lhs, const vector<Attribute> &rhs)
     }
 
     return true;
-}
+} // }}}
 
 string output_schema(string table_name, vector<Attribute> &attrs) // {{{
 {
@@ -137,6 +137,20 @@ void rmTest_SystemCatalog(RM *rm) // {{{
         t_overflow2_attrs.push_back((struct Attribute) { ss.str(), TypeVarChar, 1 });
     }
 
+    string t_exact1 = "t_exact1";
+    vector<Attribute> t_exact1_attrs;
+    t_exact1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4093 });
+
+    string t_exact2 = "t_exact2";
+    vector<Attribute> t_exact2_attrs;
+    /* 1365 + 1365*2 + 1 = 4096. */
+    for (int i = 0; i < 1365; i++)
+    {
+        stringstream ss;
+        ss << "a" << i;
+        t_exact2_attrs.push_back((struct Attribute) { ss.str(), TypeVarChar, 1 });
+    }
+
     vector<Attribute> aux_attrs;
 
     /*
@@ -209,18 +223,41 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     /* schema size tests */
     cout << "[ schema size tests ]" << endl;
+    ZERO_ASSERT(rm->createTable(t_exact1, t_exact1_attrs));
+    cout << "PASS: createTable(" << output_schema(t_exact1, t_exact1_attrs) << ") [exact]" << endl;
+    ZERO_ASSERT(rm->createTable(t_exact2, t_exact2_attrs));
+    cout << "PASS: createTable(" << output_schema(t_exact2, t_exact2_attrs).substr(0, 60)+"..." << ") [exact]" << endl;
     NONZERO_ASSERT(rm->createTable(t_overflow1, t_overflow1_attrs));
     cout << "PASS: createTable(" << output_schema(t_overflow1, t_overflow1_attrs) << ") [overflow]" << endl;
     NONZERO_ASSERT(rm->createTable(t_overflow2, t_overflow2_attrs));
     cout << "PASS: createTable(" << output_schema(t_overflow2, t_overflow2_attrs).substr(0, 60)+"..." << ") [overflow]" << endl;
-    
+    ZERO_ASSERT(rm->deleteTable(t_exact1));
+    cout << "PASS: deleteTable(" << t2 << ")" << endl;
+    ZERO_ASSERT(rm->deleteTable(t_exact2));
+    cout << "PASS: deleteTable(" << t2 << ")" << endl;
+   
 } // }}}
 
 void rmTest_TableMgmt(RM *rm) // {{{
 {
+    RID r1;
+
     string t1 = "t1";
     vector<Attribute> t1_attrs;
     t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
+    /*
+        //  Format of the data passed into the function is the following:
+        //  1) data is a concatenation of values of the attributes
+        //  2) For int and real: use 4 bytes to store the value;
+        //     For varchar: use 4 bytes to store the length of characters, then store the actual characters.
+        //  !!!The same format is used for updateTuple(), the returned data of readTuple(), and readAttribute()
+
+        RC insertTuple(const string tableName, const void *data, RID &rid);
+
+        1. 
+    */
+
 } // }}}
 
 void rmTest()
