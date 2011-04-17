@@ -1,7 +1,6 @@
-
 #include "rm.h"
 
-bool operator==(const Attribute &lhs, const Attribute &rhs);
+bool operator==(const Attribute &lhs, const Attribute &rhs)
 {
     return ((lhs.name == rhs.name) &&
             (lhs.type == rhs.type) &&

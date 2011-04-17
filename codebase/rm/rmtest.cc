@@ -88,6 +88,8 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     string t2 = "t2";
     vector<Attribute> t2_attrs;
     t2_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+    t2_attrs.push_back((struct Attribute) { "a2", TypeReal, 0 });
+    t2_attrs.push_back((struct Attribute) { "a3", TypeVarChar, 500 });
 
     /* invalid in table namespace */
     string t_invalid_name1 = "invalid.table/name";
@@ -95,6 +97,8 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     string t_invalid_name3 = "invalid/table.name";
     vector<Attribute> t_invalid_attrs;
     t_invalid_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
+    vector<Attribute> aux_attrs;
 
     /*
         [Structure of record: 1 byte for #fields, 2 bytes for field offset]
@@ -116,7 +120,8 @@ void rmTest_SystemCatalog(RM *rm) // {{{
          };
     */
     
-    /* duplicate table test. */
+    /* duplicate create table test. */
+    cout << "[ duplicate table creation. ]" << endl;
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
 
@@ -124,27 +129,36 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [duplicate]" << endl;
 
     /* duplicate table destroy test. */
+    cout << "[ duplicate table destroy. ]" << endl;
     ZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
 
     NONZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ") [doesnt exist]" << endl;
 
-    /* invalid table name destroy test. */
+    /* nonexistent table name destroy test. */
+    cout << "[ nonexistent table in namespace. ]" << endl;
     NONZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ") [doesnt exist]" << endl;
 
     /* invalid table in namespace */
+    cout << "[ invalid table in namespace. ]" << endl;
     NONZERO_ASSERT(rm->createTable(t_invalid_name1, t_invalid_attrs));
-    cout << "PASS: createTable(" << output_schema(t_invalid_name1, t_invalid_attrs) << ") [bad name]" << endl;
+    cout << "PASS: createTable(" << output_schema(t_invalid_name1, t_invalid_attrs) << ") [invalid name]" << endl;
 
     NONZERO_ASSERT(rm->createTable(t_invalid_name2, t_invalid_attrs));
-    cout << "PASS: createTable(" << output_schema(t_invalid_name2, t_invalid_attrs) << ") [bad name]" << endl;
+    cout << "PASS: createTable(" << output_schema(t_invalid_name2, t_invalid_attrs) << ") [invalid name]" << endl;
 
     NONZERO_ASSERT(rm->createTable(t_invalid_name3, t_invalid_attrs));
-    cout << "PASS: createTable(" << output_schema(t_invalid_name3, t_invalid_attrs) << ") [bad name]" << endl;
+    cout << "PASS: createTable(" << output_schema(t_invalid_name3, t_invalid_attrs) << ") [invalid name]" << endl;
 
     /* correct attribute retrieval test. */
+    cout << "[ correct attribute retrieval test. ]" << endl;
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t2, t2_attrs) << ")" << endl;
+    ZERO_ASSERT(rm->deleteTable(t2));
+    cout << "PASS: deleteTable(" << t2 << ")" << endl;
+  
     /* empty schema. */
     /* schema size tests */
     
