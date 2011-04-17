@@ -216,12 +216,21 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     
 } // }}}
 
+void rmTest_TableMgmt(RM *rm) // {{{
+{
+    string t1 = "t1";
+    vector<Attribute> t1_attrs;
+    t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+} // }}}
+
 void rmTest()
 {
     RM *rm = RM::Instance();
 
     // write your own testing cases here
+    cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
     rmTest_SystemCatalog(rm);
+    rmTest_TableMgmt(rm);
 }
 
 int main() 
