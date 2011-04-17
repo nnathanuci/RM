@@ -17,7 +17,7 @@ typedef int RC;
 
 
 // Record ID
-typedef struct
+typedef struct RID
 {
   unsigned pageNum;
   unsigned slotNum;
@@ -29,11 +29,12 @@ typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
 typedef unsigned AttrLength;
 
-struct Attribute {
+typedef struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
     AttrLength length; // attribute length
-};
+    bool operator==(const Attribute &rhs);
+} Attribute;
 
 
 // Comparison Operator
