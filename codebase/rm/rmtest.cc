@@ -178,6 +178,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "PASS: createTable(" << output_schema(t2, t2_attrs) << ")" << endl;
     ZERO_ASSERT(rm->getAttributes(t2, aux_attrs));
     assert(cmp_attrs(aux_attrs, t2_attrs));
+    aux_attrs.clear();
     cout << "PASS: getAttributes(" << t2 << ")" << endl;
     ZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
