@@ -20,26 +20,6 @@
 
 using namespace std;
 
-bool cmp_attrs(const vector<Attribute> &lhs, const vector<Attribute> &rhs) // {{{
-{
-    if(lhs.size() != rhs.size())
-        return false;
-
-    for(unsigned int i = 0; i < lhs.size(); i++)
-    {
-        if(lhs[i].name != rhs[i].name)
-            return false;
-
-        if(lhs[i].type != rhs[i].type)
-            return false;
-
-        if(lhs[i].length != rhs[i].length)
-            return false;
-    }
-
-    return true;
-} // }}}
-
 string output_schema(string table_name, vector<Attribute> &attrs) // {{{
 {
     stringstream ss;
@@ -264,7 +244,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "PASS: createTable(" << output_schema(t2, t2_attrs) << ")" << endl;
 
     ZERO_ASSERT(rm->getAttributes(t2, aux_attrs));
-    assert(cmp_attrs(aux_attrs, t2_attrs));
+    assert(aux_attrs == t2_attrs);
     aux_attrs.clear();
     cout << "PASS: getAttributes(" << t2 << ")" << endl;
 
