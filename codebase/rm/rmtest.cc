@@ -119,10 +119,33 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     vector<Attribute> t_invalid_attrs;
     t_invalid_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
 
-    /* empty schema. */
+    /* no schema. */
+    string t_noschema = "t_noschema";
+    vector<Attribute> t_noschema_attrs;
+
+    /* duplicate attribute name schema */
+    string t_duplicate = "t_duplicate";
+    vector<Attribute> t_duplicate_attrs;
+    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
+    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeReal, 0 }); 
+
+    string t_duplicate2 = "t_duplicate2";
+    vector<Attribute> t_duplicate2_attrs;
+    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
+    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
+
+
+    /* empty attribute schema */
     string t_empty = "t_empty";
     vector<Attribute> t_empty_attrs;
+    t_empty_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 0 }); 
 
+    string t_empty2 = "t_empty2";
+    vector<Attribute> t_empty2_attrs;
+    t_empty2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
+    t_empty2_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 0 }); 
+
+    /* data overflow schema */
     string t_overflow1 = "t_overflow1";
     vector<Attribute> t_overflow1_attrs;
     t_overflow1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4093 });
@@ -180,7 +203,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
          };
     */
     
-    /* duplicate create table test. */
+    /* duplicate create table test. */ // {{{
     cout << "[ duplicate table creation. ]" << endl;
 
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
@@ -188,8 +211,9 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     NONZERO_ASSERT(rm->createTable(t1, t1_attrs));
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [duplicate]" << endl;
+    // }}}
 
-    /* duplicate table destroy test. */
+    /* duplicate table destroy test. */ // {{{
     cout << "[ duplicate table destroy. ]" << endl;
 
     ZERO_ASSERT(rm->deleteTable(t1));
@@ -197,14 +221,35 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     NONZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ") [doesnt exist]" << endl;
+    // }}}
 
-    /* nonexistent table name destroy test. */
+    /* nonexistent table name destroy test. */ // {{{
     cout << "[ nonexistent table in namespace. ]" << endl;
 
     NONZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ") [doesnt exist]" << endl;
+    // }}}
 
-    /* invalid table in namespace */
+    /* duplicate attributes in schema. */ // {{{
+    cout << "[ duplicate attribute name in schema. ]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_duplicate, t_duplicate_attrs));
+    cout << "PASS: createTable(" << output_schema(t_duplicate, t_duplicate_attrs) << ") [duplicate attribute name]" << endl;
+    NONZERO_ASSERT(rm->createTable(t_duplicate2, t_duplicate2_attrs));
+    cout << "PASS: createTable(" << output_schema(t_duplicate2, t_duplicate2_attrs) << ") [duplicate attributes]" << endl;
+    // }}}
+
+    /* empty varchar attributes in schema. */ // {{{
+    cout << "[ empty varchar attribute name in schema. ]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_empty, t_empty_attrs));
+    cout << "PASS: createTable(" << output_schema(t_empty, t_empty_attrs) << ") [empty varchar]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_empty2, t_empty2_attrs));
+    cout << "PASS: createTable(" << output_schema(t_empty2, t_empty2_attrs) << ") [empty varchar]" << endl;
+    // }}}
+
+    /* invalid table in namespace */ // {{{
     cout << "[ invalid table in namespace. ]" << endl;
 
     NONZERO_ASSERT(rm->createTable(t_invalid_name1, t_invalid_attrs));
@@ -215,8 +260,16 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     NONZERO_ASSERT(rm->createTable(t_invalid_name3, t_invalid_attrs));
     cout << "PASS: createTable(" << output_schema(t_invalid_name3, t_invalid_attrs) << ") [invalid name]" << endl;
+    // }}}
 
-    /* correct attribute retrieval test. */
+    /* empty schema. */ // {{{
+    cout << "[ no schema test. ]" << endl;
+
+    NONZERO_ASSERT(rm->createTable(t_noschema, t_noschema_attrs));
+    cout << "PASS: createTable(" << output_schema(t_noschema, t_noschema_attrs) << ") [no schema]" << endl;
+    // }}}
+
+    /* correct attribute retrieval test. */ // {{{
     cout << "[ correct attribute retrieval test. ]" << endl;
 
     ZERO_ASSERT(rm->createTable(t2, t2_attrs));
@@ -229,14 +282,9 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     ZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
+    // }}}
   
-    /* empty schema. */
-    cout << "[ empty schema test. ]" << endl;
-
-    NONZERO_ASSERT(rm->createTable(t_empty, t_empty_attrs));
-    cout << "PASS: createTable(" << output_schema(t_empty, t_empty_attrs) << ") [no schema]" << endl;
-
-    /* schema size tests */
+    /* schema size tests */ // {{{
     cout << "[ schema size tests ]" << endl;
 
     ZERO_ASSERT(rm->createTable(t_exact1, t_exact1_attrs));
@@ -264,10 +312,8 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     ZERO_ASSERT(rm->deleteTable(t_exact2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
+    // }}}
 
-    /* duplicate attribute name */
-    /* empty varchar attribute name */
-   
 } // }}}
 
 void rmTest_TableMgmt(RM *rm) // {{{
