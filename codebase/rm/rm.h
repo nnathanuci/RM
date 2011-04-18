@@ -38,6 +38,7 @@ typedef struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
     AttrLength length; // attribute length
+	bool operator==(const Attribute &rhs);
 } Attribute;
 
 
