@@ -127,23 +127,23 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     /* duplicate attribute name schema */
     string t_duplicate = "t_duplicate";
     vector<Attribute> t_duplicate_attrs;
-    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
-    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeReal, 0 }); 
+    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 });
+    t_duplicate_attrs.push_back((struct Attribute) { "a0", TypeReal, 0 });
 
     string t_duplicate2 = "t_duplicate2";
     vector<Attribute> t_duplicate2_attrs;
-    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
-    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
+    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 });
+    t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 });
 
     /* empty attribute schema */
     string t_empty = "t_empty";
     vector<Attribute> t_empty_attrs;
-    t_empty_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 0 }); 
+    t_empty_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 0 });
 
     string t_empty2 = "t_empty2";
     vector<Attribute> t_empty2_attrs;
-    t_empty2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
-    t_empty2_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 0 }); 
+    t_empty2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 });
+    t_empty2_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 0 });
 
     /* data overflow schema */
     string t_overflow1 = "t_overflow1";
@@ -153,7 +153,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     string t_overflow2 = "t_overflow2";
     vector<Attribute> t_overflow2_attrs;
     /* 2 + 2 + 4 = 8 bytes for field count and first field. */
-    t_overflow2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 4 }); 
+    t_overflow2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 4 });
 
     /* fill attributes for a total of 4089 bytes (excluding 2 byte field count)*/
     for (int i = 1; i <= 1363; i++)
@@ -171,7 +171,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     string t_exact2 = "t_exact2";
     vector<Attribute> t_exact2_attrs;
     /* 2 + 2 + 3 = 7 bytes for field count and first field. */
-    t_exact2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 3 }); 
+    t_exact2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 3 });
 
     /* fill attributes for a total of 4089 bytes (excluding 2 byte field count)*/
     for (int i = 1; i <= 1363; i++)
@@ -202,7 +202,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
              AttrLength length; // attribute length
          };
     */
-    
+
     /* Table creation/deletion test. */ // {{{
 
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
@@ -420,7 +420,7 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    //testRecWrite(rm);
+    testRecWrite(rm);
     rmTest_SystemCatalog(rm);
     rmTest_TableMgmt(rm);
 }

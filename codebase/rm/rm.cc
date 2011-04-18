@@ -22,7 +22,7 @@ RM* RM::Instance()
         _rm = new RM();
     
     //If .catalog file exists this will open and close it, otherwise will create it.
-    fclose(fopen(attributeLoc, "wb+"));
+    fclose(fopen(attributeLoc, "ab+"));
 
     return _rm;
 }
