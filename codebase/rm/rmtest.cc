@@ -12,11 +12,11 @@
 #define ATTR_REAL_SIZE 4
 
 // XXX: toggle when complete
-//#define ZERO_ASSERT(x) assert((x) == 0)
-//#define NONZERO_ASSERT(x) assert((x) != 0)
+#define ZERO_ASSERT(x) assert((x) == 0)
+#define NONZERO_ASSERT(x) assert((x) != 0)
 
-#define ZERO_ASSERT(x) ((x) == 0);
-#define NONZERO_ASSERT(x) ((x) == 1);
+//#define ZERO_ASSERT(x) ((x) == 0);
+//#define NONZERO_ASSERT(x) ((x) == 1);
 
 using namespace std;
 
@@ -204,6 +204,16 @@ void rmTest_SystemCatalog(RM *rm) // {{{
          };
     */
     
+    /* Table creation/deletion test. */ // {{{
+
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+
+    // }}}
+
     /* duplicate create table test. */ // {{{
     cout << "[ duplicate table creation. ]" << endl;
 
@@ -391,7 +401,7 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    testRecWrite(rm);
+    //testRecWrite(rm);
     rmTest_SystemCatalog(rm);
     rmTest_TableMgmt(rm);
 }
