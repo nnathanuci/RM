@@ -39,7 +39,7 @@ typedef struct Attribute {
     AttrType type;     // attribute type
     AttrLength length; // attribute length
 
-    int operator==(const Attribute &rhs)
+    int operator==(const Attribute &rhs) const
     {
         if(name != rhs.name)
             return (name == rhs.name);
@@ -53,7 +53,7 @@ typedef struct Attribute {
         return (0 == 0);
     }
 
-    int operator<(const Attribute &rhs)
+    int operator<(const Attribute &rhs) const
     {
         return (name < rhs.name);
     }
