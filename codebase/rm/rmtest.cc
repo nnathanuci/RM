@@ -67,39 +67,6 @@ string output_schema(string table_name, vector<Attribute> &attrs) // {{{
     return ss.str();
 } // }}}
 
-unsigned int compute_schema_size(vector<Attribute> &attrs) // {{{
-{
-    unsigned int size = 2; // number of fields marker
-
-    /* typedef unsigned AttrLength;
-       typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
-          struct Attribute {
-             string   name;     // attribute name
-             AttrType type;     // attribute type
-             AttrLength length; // attribute length
-         };
-    */
-
-    size += attrs.size() * 2; /* field offset is 2 bytes, XXX: magic constant. */
-
-    for (unsigned int i = 0; i < attrs.size(); i++)
-    {
-        switch (attrs[i].type)
-        {
-            case TypeInt:
-            case TypeReal:
-                 size += 4;
-                 break;
-
-            case TypeVarChar:
-                 size += attrs[i].length;
-                 break;
-        }
-    }
-
-    return size;
-} // }}}
-
 void rmTest_SystemCatalog(RM *rm) // {{{
 {
     string t1 = "t1";
@@ -318,24 +285,24 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     cout << "[ schema size tests ]" << endl;
 
     ZERO_ASSERT(rm->createTable(t_exact1, t_exact1_attrs));
-    assert(compute_schema_size(t_exact1_attrs) <= PF_PAGE_SIZE);
-    cout << compute_schema_size(t_exact1_attrs) << endl;
-    cout << "PASS: createTable(" << output_schema(t_exact1, t_exact1_attrs) << ") [exact]" << endl;
+    assert(rm->getSchemaSize(t_exact1_attrs) <= PF_PAGE_SIZE);
+    cout << "PASS: createTable(" << output_schema(t_exact1, t_exact1_attrs)
+         << ") [size=" << rm->getSchemaSize(t_exact1_attrs) << "]" << endl;
 
     ZERO_ASSERT(rm->createTable(t_exact2, t_exact2_attrs));
-    assert(compute_schema_size(t_exact2_attrs) <= PF_PAGE_SIZE);
-    cout << compute_schema_size(t_exact2_attrs) << endl;
-    cout << "PASS: createTable(" << output_schema(t_exact2, t_exact2_attrs).substr(0, 60)+"..." << ") [exact]" << endl;
+    assert(rm->getSchemaSize(t_exact2_attrs) <= PF_PAGE_SIZE);
+    cout << "PASS: createTable(" << output_schema(t_exact2, t_exact2_attrs).substr(0, 60)+"..."
+         << ") [size=" << rm->getSchemaSize(t_exact2_attrs) << "]" << endl;
 
     NONZERO_ASSERT(rm->createTable(t_overflow1, t_overflow1_attrs));
-    assert(compute_schema_size(t_overflow1_attrs) > PF_PAGE_SIZE);
-    cout << compute_schema_size(t_overflow1_attrs) << endl;
-    cout << "PASS: createTable(" << output_schema(t_overflow1, t_overflow1_attrs) << ") [overflow]" << endl;
+    assert(rm->getSchemaSize(t_overflow1_attrs) > PF_PAGE_SIZE);
+    cout << "PASS: createTable(" << output_schema(t_overflow1, t_overflow1_attrs)
+         << ") [overflow, size=" << rm->getSchemaSize(t_overflow1_attrs) << "]" << endl;
 
     NONZERO_ASSERT(rm->createTable(t_overflow2, t_overflow2_attrs));
-    assert(compute_schema_size(t_overflow2_attrs) > PF_PAGE_SIZE);
-    cout << compute_schema_size(t_overflow2_attrs) << endl;
-    cout << "PASS: createTable(" << output_schema(t_overflow2, t_overflow2_attrs).substr(0, 60)+"..." << ") [overflow]" << endl;
+    assert(rm->getSchemaSize(t_overflow2_attrs) > PF_PAGE_SIZE);
+    cout << "PASS: createTable(" << output_schema(t_overflow2, t_overflow2_attrs).substr(0,60)+"..."
+          << ") [overflow, size=" << rm->getSchemaSize(t_overflow2_attrs) << "]" << endl;
 
     ZERO_ASSERT(rm->deleteTable(t_exact1));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
@@ -420,7 +387,7 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    testRecWrite(rm);
+    //testRecWrite(rm);
     rmTest_SystemCatalog(rm);
     rmTest_TableMgmt(rm);
 }
