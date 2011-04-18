@@ -149,6 +149,7 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     /* create table. */
     catalog[tableName] = attrs;
 
+    /* add fields for quick lookup (table.fieldname) */
     for(unsigned int i = 0; i < attrs.size(); i++)
         catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
 
@@ -180,6 +181,7 @@ RC RM::deleteTable(const string tableName)
     for(unsigned int i = 0; i < attrs.size(); i++)
         catalog_fields.erase(tableName+"."+attrs[i].name);
 
+    /* delete table. */
     catalog.erase(tableName);
 
     return 0;
