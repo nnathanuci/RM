@@ -1,41 +1,26 @@
-
 #include "rm.h"
-#include <stdio.h>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
-#include <string.h>
+#include <string>
 
 RM* RM::_rm = 0;
-PF_Manager* RM::_pm;
-
-map<string, vector<Attribute> > RM::catalog;
-
-static const char* attributeLoc = "./attributes.catalog";
 
 RM* RM::Instance()
 {
-    if(!_pm)
-    	_pm = PF_Manager::Instance();
-
     if(!_rm)
         _rm = new RM();
     
-    //If .catalog file exists this will open and close it, otherwise will create it.
-    fclose(fopen(attributeLoc, "ab+"));
-
     return _rm;
 }
 
 RM::RM()
 {
+    pf = PF_Manager::Instance();
 }
 
 RM::~RM()
 {
-    if(!_rm)
-    	delete _rm;
-    //delete RM::catalog;
 }
 
 //Write the first x bytes of the value val into the first x bytes starting from s.
@@ -96,42 +81,106 @@ RC RM::produceHeader(const vector<Attribute> &attrs, char* header)
 //table	attribute  position type max_size nullable
 //vchar	vchar	   int 	    int	 int	  char
 
+unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
+{
+    unsigned int size = 2; // number of fields marker
+
+    size += attrs.size() * 2; /* field offset is 2 bytes, XXX: magic constant. */
+
+    for (unsigned int i = 0; i < attrs.size(); i++)
+    {
+        switch (attrs[i].type)
+        {
+            case TypeInt:
+            case TypeReal:
+                 size += 4;
+                 break;
+
+            case TypeVarChar:
+                 size += attrs[i].length;
+                 break;
+        }
+    }
+
+    return size;
+}
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
 {
-	PF_FileHandle handle;
-	//table_name attribute_name position type max_size nullable
+    //table_name attribute_name position type max_size nullable
 
-	unsigned int a_size = attrs.size();
-	catalog[tableName] = attrs;
-	for (unsigned int i = 0; i < a_size; i++)
-	{
-		string key = tableName + "." + attrs[i].name;
-		catalog[key] = attrs;
-		cout << key << endl;
-	}
+    /* check table name. */
+    if(tableName.find_first_of("/.") != string::npos)
+        return 1;
 
-	for (unsigned int i = 0; i < catalog[tableName + "." + attrs[0].name].size(); i++)
-	{
-		cout << " VALUE " << catalog[tableName + "." + attrs[0].name][i].name << endl;
-	}
+    /* check attribute name. */
+    for(unsigned int i = 0; i < attrs.size(); i++)
+        if(attrs[i].name.find_first_of("/.") != string::npos)
+            return 1;
 
-	//RM::catalog[tableName] = attrs;
+    /* no empty schema. */
+    if (attrs.size() == 0)
+        return 1;
 
-	//_pm->OpenFile(attributeLoc , handle);
-	//_pm->CloseFile(handle);
+    /* no empty varchar attributes. */
+    for(unsigned int i = 0; i < attrs.size(); i++)
+        if(attrs[i].type == TypeVarChar && attrs[i].length == 0)
+            return 1;
 
-	//A table maps to a single file, and a single file contains only one table.
-	return _pm->CreateFile(tableName.c_str());
+    /* no duplicate attribute names. */
+    map<string, int> dupes;
+    for(unsigned int i = 0; i < attrs.size(); i++)
+    {
+        /* entry already exists, duplicate found. */
+        if(dupes.count(attrs[i].name))
+            return 1;
+
+        dupes[attrs[i].name] = 1;
+    }
+
+    /* check schema fits in a page. */
+    if(getSchemaSize(attrs) > PF_PAGE_SIZE)
+        return 1;
+
+    /* table exists. */
+    if(catalog.count(tableName))
+        return 1;
+
+    /* create table. */
+    catalog[tableName] = attrs;
+
+    for(unsigned int i = 0; i < attrs.size(); i++)
+        catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
+
+    return 0;
 }
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
 {
-	attrs = catalog[tableName];
-	return 0;
+    /* table doesnt exists. */
+    if(!catalog.count(tableName))
+        return 1;
+
+    attrs = catalog[tableName];
+
+    return 0;
 }
 
 RC RM::deleteTable(const string tableName)
 {
-    return 1;
+    vector<Attribute> attrs;
+
+    /* table doesnt exists. */
+    if(!catalog.count(tableName))
+        return 1;
+
+    getAttributes(tableName, attrs);
+
+    /* delete all fields from catalog_fields. */
+    for(unsigned int i = 0; i < attrs.size(); i++)
+        catalog_fields.erase(tableName+"."+attrs[i].name);
+
+    catalog.erase(tableName);
+
+    return 0;
 }

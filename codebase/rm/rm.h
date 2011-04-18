@@ -38,6 +38,25 @@ typedef struct Attribute {
     string   name;     // attribute name
     AttrType type;     // attribute type
     AttrLength length; // attribute length
+
+    int operator==(const Attribute &rhs)
+    {
+        if(name != rhs.name)
+            return (name == rhs.name);
+
+        if(type != rhs.type)
+            return (type == rhs.type);
+
+        if(length != rhs.length)
+            return (length == rhs.length);
+
+        return (0 == 0);
+    }
+
+    int operator<(const Attribute &rhs)
+    {
+        return (name < rhs.name);
+    }
 } Attribute;
 
 
@@ -80,7 +99,6 @@ class RM
 public:
   static RM* Instance();
 
-
   RC createTable(const string tableName, const vector<Attribute> &attrs);
 
   RC deleteTable(const string tableName);
@@ -106,8 +124,6 @@ public:
   RC readAttribute(const string tableName, const RID &rid, const string attributeName, void *data);
 
   RC reorganizePage(const string tableName, const unsigned pageNumber);
-
-  RC produceHeader(const vector<Attribute> &attrs, char*);
 
   // scan returns an iterator to allow the caller to go through the results one by one.
   RC scan(const string tableName, 
@@ -137,8 +153,18 @@ protected:
 
 private:
   static RM *_rm;
-  static PF_Manager *_pm;
-  static map<string, vector<Attribute> > catalog;
+
+// Defined by group 14
+
+public:
+  RC produceHeader(const vector<Attribute> &attrs, char*);
+
+  unsigned getSchemaSize(const vector<Attribute> &attrs);
+
+private:
+  PF_Manager *pf;
+  map<string, vector<Attribute> > catalog;
+  map<string, Attribute> catalog_fields;
 };
 
 #endif
