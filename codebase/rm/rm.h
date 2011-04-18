@@ -6,6 +6,7 @@
 #include <vector>
 #include <ostream>
 #include <iostream>
+#include <map>
 
 #include "../pf/pf.h"
 
@@ -23,6 +24,10 @@ typedef struct RID
   unsigned slotNum;
 } RID;
 
+static const unsigned int bytesPerInt = 4;
+static const unsigned int bytesPerReal = 4;
+static const unsigned int bytesPerOffset = 2;
+static const unsigned int bitsInByte = 8;
 
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
@@ -49,7 +54,7 @@ typedef enum { EQ_OP = 0,  // =
 
 # define RM_EOF (-1)  // end of a scan operator
 
-// RM_ScanIterator is an iteratr to go through records
+// RM_ScanIterator is an iterator to go through records
 // The way to use it is like the following:
 //  RM_ScanIterator rmScanIterator;
 //  rm.open(..., rmScanIterator);
@@ -74,6 +79,7 @@ class RM
 {
 public:
   static RM* Instance();
+
 
   RC createTable(const string tableName, const vector<Attribute> &attrs);
 
@@ -101,10 +107,13 @@ public:
 
   RC reorganizePage(const string tableName, const unsigned pageNumber);
 
+  RC produceHeader(const vector<Attribute> &attrs, char*);
+
   // scan returns an iterator to allow the caller to go through the results one by one.
   RC scan(const string tableName, 
       const vector<string> &attributeNames, // a list of projected attributes
       RM_ScanIterator &rm_ScanIterator);
+
 
 // Extra credit
 public:
@@ -128,6 +137,8 @@ protected:
 
 private:
   static RM *_rm;
+  static PF_Manager *_pm;
+  static map<string, vector<Attribute> > catalog;
 };
 
 #endif

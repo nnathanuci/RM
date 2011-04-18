@@ -3,6 +3,7 @@
 #include <cassert>
 #include <sstream>
 #include <vector>
+#include <string.h>
 
 #include "rm.h"
 
@@ -48,7 +49,7 @@ string output_schema(string table_name, vector<Attribute> &attrs) // {{{
     {
         ss << " " << attrs[i].name << ":";
         switch (attrs[i].type)
-        { 
+        {
             case TypeInt:
                  ss << "Int";
                  break;
@@ -84,7 +85,7 @@ unsigned int compute_schema_size(vector<Attribute> &attrs) // {{{
     for (unsigned int i = 0; i < attrs.size(); i++)
     {
         switch (attrs[i].type)
-        { 
+        {
             case TypeInt:
             case TypeReal:
                  size += 4;
@@ -193,9 +194,9 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
          // Attribute
          typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
-         
+
          typedef unsigned AttrLength;
-         
+
          struct Attribute {
              string   name;     // attribute name
              AttrType type;     // attribute type
@@ -332,11 +333,58 @@ void rmTest_TableMgmt(RM *rm) // {{{
         //  !!!The same format is used for updateTuple(), the returned data of readTuple(), and readAttribute()
 
         RC insertTuple(const string tableName, const void *data, RID &rid);
-
-        1. 
     */
 
 } // }}}
+
+unsigned int read_first_x_bytes_as_int32(const unsigned int x,const char* s)
+{
+	unsigned int int32 = 0;
+	for (unsigned int i = (x-1); i > 0; i--)
+		int32 = ( (int32 | (s[i]&0xFF) ) << bitsInByte );
+	return int32 = (int32 | ((s[0]) & 0xFF));
+}
+
+void next_field(char *&iter)
+{
+	iter += bytesPerOffset;
+}
+void print_record( char* record )
+{
+	char* iter = record;
+	unsigned int count = read_first_x_bytes_as_int32(bytesPerOffset, iter);
+	cout << "Field Count: " << count << endl;
+	next_field(iter);
+	for (unsigned int i = 0; i < count; i++)
+	{
+		int field_start = read_first_x_bytes_as_int32(bytesPerOffset, iter);
+		int field_end   = read_first_x_bytes_as_int32(bytesPerOffset, iter+1);
+		cout << "FO_" << i << ": " << field_start << endl;
+		cout << "F_" << i << ": " << read_first_x_bytes_as_int32(field_end - field_start, record+field_start) << endl;
+		next_field(iter);
+	}
+	cout << "END_AT: " << read_first_x_bytes_as_int32(bytesPerOffset, iter) << endl;
+	next_field(iter);
+}
+void testRecWrite()
+{
+	RM *rm = RM::Instance();
+	vector<Attribute> attrs;
+	vector<Attribute> attrs2;
+	attrs.push_back((struct Attribute) { "a1", TypeInt, 4 });
+	attrs.push_back((struct Attribute) { "a2", TypeReal, 4 });
+	attrs.push_back((struct Attribute) { "a3", TypeVarChar, 10 });
+
+	char test_chars[28];
+	memset( test_chars, 0, 28 * sizeof(char) );
+	rm->produceHeader(attrs, test_chars);
+	print_record( test_chars );
+
+	rm->createTable("tableTest", attrs);
+	rm->getAttributes("tableTest", attrs2);
+
+	cout << "ATRR2 " << attrs2.size() << endl ;
+}
 
 void rmTest()
 {
@@ -344,11 +392,12 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    rmTest_SystemCatalog(rm);
-    rmTest_TableMgmt(rm);
+    testRecWrite();
+    //rmTest_SystemCatalog(rm);
+    //rmTest_TableMgmt(rm);
 }
 
-int main() 
+int main()
 {
     cout << "test..." << endl;
 
