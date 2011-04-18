@@ -366,9 +366,8 @@ void print_record( char* record )
 	cout << "END_AT: " << read_first_x_bytes_as_int32(bytesPerOffset, iter) << endl;
 	next_field(iter);
 }
-void testRecWrite()
+void testRecWrite(RM *rm)
 {
-	RM *rm = RM::Instance();
 	vector<Attribute> attrs;
 	vector<Attribute> attrs2;
 	attrs.push_back((struct Attribute) { "a1", TypeInt, 4 });
@@ -392,9 +391,9 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    testRecWrite();
-    //rmTest_SystemCatalog(rm);
-    //rmTest_TableMgmt(rm);
+    testRecWrite(rm);
+    rmTest_SystemCatalog(rm);
+    rmTest_TableMgmt(rm);
 }
 
 int main()
