@@ -41,21 +41,7 @@ typedef struct Attribute {
 
     int operator==(const Attribute &rhs) const
     {
-        if(name != rhs.name)
-            return (name == rhs.name);
-
-        if(type != rhs.type)
-            return (type == rhs.type);
-
-        if(length != rhs.length)
-            return (length == rhs.length);
-
-        return (0 == 0);
-    }
-
-    int operator<(const Attribute &rhs) const
-    {
-        return (name < rhs.name);
+        return((name == rhs.name) && (type == rhs.type) && (lenght != rhs.length));
     }
 } Attribute;
 
