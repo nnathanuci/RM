@@ -68,7 +68,7 @@ string output_schema(string table_name, vector<Attribute> &attrs) // {{{
 
 unsigned int compute_schema_size(vector<Attribute> &attrs) // {{{
 {
-    unsigned int size = 1;
+    unsigned int size = 2; // number of fields marker
 
     /* typedef unsigned AttrLength;
        typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
@@ -125,12 +125,15 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     string t_overflow1 = "t_overflow1";
     vector<Attribute> t_overflow1_attrs;
-    t_overflow1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4094 });
+    t_overflow1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4093 });
 
     string t_overflow2 = "t_overflow2";
     vector<Attribute> t_overflow2_attrs;
-    /* 1365 + 1365*2 + 1 = 4096. */
-    for (int i = 0; i < 1366; i++)
+    /* 2 + 2 + 4 = 8 bytes for field count and first field. */
+    t_overflow2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 4 }); 
+
+    /* fill attributes for a total of 4089 bytes (excluding 2 byte field count)*/
+    for (int i = 1; i <= 1363; i++)
     {
         stringstream ss;
         ss << "a" << i;
@@ -139,12 +142,16 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     string t_exact1 = "t_exact1";
     vector<Attribute> t_exact1_attrs;
-    t_exact1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4093 });
+    /* 2 + 2 + 4092 = 4096 */
+    t_exact1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4092 });
 
     string t_exact2 = "t_exact2";
     vector<Attribute> t_exact2_attrs;
-    /* 1365 + 1365*2 + 1 = 4096. */
-    for (int i = 0; i < 1365; i++)
+    /* 2 + 2 + 3 = 7 bytes for field count and first field. */
+    t_exact2_attrs.push_back((struct Attribute) { "a0", TypeVarChar, 3 }); 
+
+    /* fill attributes for a total of 4089 bytes (excluding 2 byte field count)*/
+    for (int i = 1; i <= 1363; i++)
     {
         stringstream ss;
         ss << "a" << i;
@@ -175,6 +182,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     
     /* duplicate create table test. */
     cout << "[ duplicate table creation. ]" << endl;
+
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
 
@@ -183,6 +191,7 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     /* duplicate table destroy test. */
     cout << "[ duplicate table destroy. ]" << endl;
+
     ZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
 
@@ -191,11 +200,13 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     /* nonexistent table name destroy test. */
     cout << "[ nonexistent table in namespace. ]" << endl;
+
     NONZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ") [doesnt exist]" << endl;
 
     /* invalid table in namespace */
     cout << "[ invalid table in namespace. ]" << endl;
+
     NONZERO_ASSERT(rm->createTable(t_invalid_name1, t_invalid_attrs));
     cout << "PASS: createTable(" << output_schema(t_invalid_name1, t_invalid_attrs) << ") [invalid name]" << endl;
 
@@ -207,34 +218,55 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     /* correct attribute retrieval test. */
     cout << "[ correct attribute retrieval test. ]" << endl;
+
     ZERO_ASSERT(rm->createTable(t2, t2_attrs));
     cout << "PASS: createTable(" << output_schema(t2, t2_attrs) << ")" << endl;
+
     ZERO_ASSERT(rm->getAttributes(t2, aux_attrs));
     assert(cmp_attrs(aux_attrs, t2_attrs));
     aux_attrs.clear();
     cout << "PASS: getAttributes(" << t2 << ")" << endl;
+
     ZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
   
     /* empty schema. */
     cout << "[ empty schema test. ]" << endl;
+
     NONZERO_ASSERT(rm->createTable(t_empty, t_empty_attrs));
     cout << "PASS: createTable(" << output_schema(t_empty, t_empty_attrs) << ") [no schema]" << endl;
 
     /* schema size tests */
     cout << "[ schema size tests ]" << endl;
+
     ZERO_ASSERT(rm->createTable(t_exact1, t_exact1_attrs));
+    assert(compute_schema_size(t_exact1_attrs) <= PF_PAGE_SIZE);
+    cout << compute_schema_size(t_exact1_attrs) << endl;
     cout << "PASS: createTable(" << output_schema(t_exact1, t_exact1_attrs) << ") [exact]" << endl;
+
     ZERO_ASSERT(rm->createTable(t_exact2, t_exact2_attrs));
+    assert(compute_schema_size(t_exact2_attrs) <= PF_PAGE_SIZE);
+    cout << compute_schema_size(t_exact2_attrs) << endl;
     cout << "PASS: createTable(" << output_schema(t_exact2, t_exact2_attrs).substr(0, 60)+"..." << ") [exact]" << endl;
+
     NONZERO_ASSERT(rm->createTable(t_overflow1, t_overflow1_attrs));
+    assert(compute_schema_size(t_overflow1_attrs) > PF_PAGE_SIZE);
+    cout << compute_schema_size(t_overflow1_attrs) << endl;
     cout << "PASS: createTable(" << output_schema(t_overflow1, t_overflow1_attrs) << ") [overflow]" << endl;
+
     NONZERO_ASSERT(rm->createTable(t_overflow2, t_overflow2_attrs));
+    assert(compute_schema_size(t_overflow2_attrs) > PF_PAGE_SIZE);
+    cout << compute_schema_size(t_overflow2_attrs) << endl;
     cout << "PASS: createTable(" << output_schema(t_overflow2, t_overflow2_attrs).substr(0, 60)+"..." << ") [overflow]" << endl;
+
     ZERO_ASSERT(rm->deleteTable(t_exact1));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
+
     ZERO_ASSERT(rm->deleteTable(t_exact2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
+
+    /* duplicate attribute name */
+    /* empty varchar attribute name */
    
 } // }}}
 
