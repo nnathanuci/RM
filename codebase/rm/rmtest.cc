@@ -135,7 +135,6 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
     t_duplicate2_attrs.push_back((struct Attribute) { "a0", TypeInt, 0 }); 
 
-
     /* empty attribute schema */
     string t_empty = "t_empty";
     vector<Attribute> t_empty_attrs;
@@ -283,6 +282,17 @@ void rmTest_SystemCatalog(RM *rm) // {{{
     /* correct attribute retrieval test. */ // {{{
     cout << "[ correct attribute retrieval test. ]" << endl;
 
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+
+    ZERO_ASSERT(rm->getAttributes(t1, aux_attrs));
+    assert(cmp_attrs(aux_attrs, t1_attrs));
+    aux_attrs.clear();
+    cout << "PASS: getAttributes(" << t1 << ")" << endl;
+
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+
     ZERO_ASSERT(rm->createTable(t2, t2_attrs));
     cout << "PASS: createTable(" << output_schema(t2, t2_attrs) << ")" << endl;
 
@@ -293,6 +303,15 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
     ZERO_ASSERT(rm->deleteTable(t2));
     cout << "PASS: deleteTable(" << t2 << ")" << endl;
+    // }}}
+
+    /* non-existent table attribute retrieval test. */ // {{{
+    cout << "[ non-existent table attribute retrieval test. ]" << endl;
+
+    NONZERO_ASSERT(rm->getAttributes(t1, aux_attrs));
+    aux_attrs.clear();
+    cout << "PASS: getAttributes(" << t1 << ") [table doesnt exist]" << endl;
+
     // }}}
   
     /* schema size tests */ // {{{
