@@ -1,0 +1,26 @@
+Table data is stored stored in heap files.
+
+- Each page in the heap is 4096 bytes (4KB) in size.
+
+- A page is either:
+  * a control page
+  * a data page
+
+- The space needed to address a page is 12 bits. When convenient we use
+  2 bytes instead.
+
+Control Pages:
+
+- A control page tells us the amount of unused space in a data page.
+
+- The format for a control page is as follows:
+  (free_0, free_1, free_2, ..., free_k, ..., next_control_pid)
+
+  * next_control_pid is an unsigned 32-bit int, stored at offset 4092
+    in the page.
+
+- For example, to find the amount of unused space for page 20.
+  Calculate the bit offset:            20*12 = 240.
+  Find the byte offset:                240 / 8 = 30
+  Find the bit offset:                 240 % 8 = 0
+  Find the amount of unused space:     unsigned short x = (page[30] << 4) | (page[31] >> 4)
