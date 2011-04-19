@@ -78,6 +78,42 @@ Compacting is difficult and expensive computationally.
 1. Construct a list of (slot_id, offset) tuples.
 2. Sort on the offset field.
 3. The list will now be a sorted arrangement of the original list.
-4. Adjacent (slot_id, offset) tuple, correspond to their adjacency in the page itself.
+4. Adjacent (slot_id, offset) tuple, correspond to the right-adjacency.
 5. Compact all adjacent records, tuple redirects, etc.
 6. Rewrite all the offsets.
+
+Alternative 1:
+  * Requires each unused fragment to have at least 2 bytes.
+    - Tricky case for altered records of -1 bytes.
+    - Use linear search or hash table (key=offset) on the slot directory.
+      
+  * Stores the amount of free space in the fragment.
+
+  * To indicate the free space, mask the first 4 bits.
+
+  * e.g. If there's 512 bytes space in the fragment:
+         int16_t *fragment = (int16_t *) fragment_ptr; // cast as 16-bit int
+         *fragment = 0xF0 | 512
+
+         Check if it's a fragment:
+         int16_t *check = record + record_length;
+         if((*check & 0xF0) == 0xF0) // then it's an unused fragment
+
+  * By masking the first 4 bits, it's easy to tell if there's an adjacent
+    record, tuple redirection, or unused space fragment.
+
+  * Problem: We cannot determine the adjacent record in the slot.
+             - See Alternative 2 for solution.
+
+Alternative 2:
+  * Same premise as alternative 1, but instead store the slot number
+    of the adjacent record (in the direction of end of page).
+
+  * Solves problem of identifying the adjacent record and slot.
+
+  * Problem: Cannot identify the adjacent slot number if the packing is
+             already contiguous?
+
+  * Solution: Not an issue for compaction. Skip all contiguous records.
+    The fragments are only a concern for only records aligned at the end of
+    the fragment.
