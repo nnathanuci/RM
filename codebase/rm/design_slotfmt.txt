@@ -7,7 +7,6 @@ Note the following distinction between free vs. unused space:
 - free space refers to the amount of contiguous free space, after the records.
 - unused space refers to the amount of unused space regardless of fragmentation.
 
-
 Slotted Page Format:
 - The slotted page format has three classes of data that require management:
   * records
@@ -71,3 +70,14 @@ Slotted Page Format:
        * Update unused spacein control page.
 
 - When a record is deleted, update offset to 4096 (or some other way to say its deleted), and updateunused space in control page.
+
+Compaction Algorithm:
+
+Compacting is difficult and expensive computationally.
+
+1. Construct a list of (slot_id, offset) tuples.
+2. Sort on the offset field.
+3. The list will now be a sorted arrangement of the original list.
+4. Adjacent (slot_id, offset) tuple, correspond to their adjacency in the page itself.
+5. Compact all adjacent records, tuple redirects, etc.
+6. Rewrite all the offsets.
