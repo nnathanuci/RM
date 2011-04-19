@@ -2,7 +2,9 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
-#include <string>
+#include <stdio.h>
+#include <string.h>
+
 
 RM* RM::_rm = 0;
 
