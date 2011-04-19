@@ -24,3 +24,31 @@ Control Pages:
   Find the byte offset:                240 / 8 = 30
   Find the bit offset:                 240 % 8 = 0
   Find the amount of unused space:     unsigned short x = (page[30] << 4) | (page[31] >> 4)
+
+  
+ Steps For Insert data_tuple into table "table":
+  
+ Lookup catalog table info for "table", this gets you the attributes vector.
+ 
+ Produce a record of size r_b bytes using the attributes, and the data given.
+ 
+ Test whether r_b <= PAGE_SIZE if so error out otherwise continue. 
+ 
+ Identify page with sufficient space to accomodate all r_b bytes of the record.
+ *Do this by reading in the control page, and sequentially reading the vector
+ (free_0, free_1, free_2, ..., free_k, ..., next_control_pid) until a space 
+ large enough is found. (say it is found at free_i)*
+ 
+ Identify the starting offset within data page i of a memory slot large enough 
+ to accomodate r_b bytes call it i_fo. (How are we doing this ?) 
+ 
+ Read slot table at page i, add a new record id (rid) for the record into 
+ the slot table. call it rid_r (How are we doing this ?)
+ 
+ Modify the slot table so that SLOT_TABLE[rid_r] = i_fo (or = i_fo + r_b ?)
+ 
+ Write the record on page i, on bytes [i_fo, i_fo + r_b].
+ 
+
+ ^^Question: Can you look through that and change what you think is wrong or 
+ imprecise ?
