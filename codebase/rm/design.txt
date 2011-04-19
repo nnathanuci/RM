@@ -25,6 +25,8 @@ Control Pages:
   Find the bit offset:                 240 % 8 = 0
   Find the amount of unused space:     unsigned short x = (page[30] << 4) | (page[31] >> 4)
 
+--------------------
+@darkhipo questions:
   
  Steps For Insert data_tuple into table "table":
   
