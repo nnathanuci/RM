@@ -17,7 +17,7 @@ Control Pages:
   (free_0, free_1, free_2, ..., free_k, ..., next_control_pid)
 
   * next_control_pid is an unsigned 32-bit int, stored at offset 4092
-    in the page.
+    in the page. It indicates the next control page, page id.
 
 - For example, to find the amount of unused space for page 20.
   Calculate the bit offset:            20*12 = 240.
