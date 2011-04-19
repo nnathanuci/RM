@@ -41,7 +41,7 @@ typedef struct Attribute {
 
     int operator==(const Attribute &rhs) const
     {
-        return((name == rhs.name) && (type == rhs.type) && (lenght != rhs.length));
+        return((name == rhs.name) && (type == rhs.type) && (length != rhs.length));
     }
 } Attribute;
 

@@ -368,7 +368,7 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    //testRecWrite(rm);
+    testRecWrite(rm);
     rmTest_SystemCatalog(rm);
     rmTest_TableMgmt(rm);
 }
