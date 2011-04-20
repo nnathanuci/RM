@@ -100,7 +100,7 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
                  break;
 
             case TypeReal:
-                 size += sizeof(float)
+                 size += sizeof(float);
                  break;
 
             case TypeVarChar:
@@ -332,7 +332,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
    record_length = RECORD_LENGTH(record);
 
    /* find usable data page lareg enough to store record, returns page_id. */
-   page_num = findBlankPage(handle, record_length);
+   //page_num = findBlankPage(handle, record_length);
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
