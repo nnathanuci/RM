@@ -12,6 +12,24 @@
 
 using namespace std;
 
+// user-defined:
+
+/* returns the relative offset where data begins in a record. */
+#define REC_START_DATA_OFFSET(n_fields) (sizeof(unsigned short)*(n_fields) + sizeof(unsigned short))
+
+/* returns relative offset for where the end offset for the i-th field is stored. */
+#define REC_FIELD_OFFSET(i) (sizeof(unsigned short)*(i) + sizeof(unsigned short))
+
+/* following macro finds the record length given an offset:
+   (*((short *) rec_offset)) - 1 == index offset of last field (2+(number of fields-1))
+   record_offset + FIELD_OFFSET(index of last field) positions pointer to the end offset.
+   The end offset value is the size of the record.
+*/
+
+typedef unsigned short rec_offset_t;
+
+#define REC_LENGTH(rec_offset) (*((rec_offset_t *) ((char *) (rec_offset) + (REC_FIELD_OFFSET((*((rec_offset_t *) (rec_offset)))-1)))))
+
 
 // Return code
 typedef int RC;
@@ -135,7 +153,7 @@ protected:
 private:
   static RM *_rm;
 
-// Defined by group 14
+// user-defined:
 
 public:
   RC produceHeader(const vector<Attribute> &attrs, char*);
@@ -143,8 +161,15 @@ public:
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
 private:
-  // interface to open_tables map.
+  /* interface to open_tables map. */
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
+
+  /* find blank page given a requested length. */
+  RC findBlankPage(const PF_FileHandle &handle, rec_offset_t length);
+
+  /* auxillary functions for insertTuple and readTuple. */
+  void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
+  void record_to_tuple(char *record, const void *tuple, const vector<Attribute> &attrs);
 
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
@@ -153,24 +178,6 @@ private:
   /* once a table is open, the file should persist. */
   map<string, PF_FileHandle> open_tables;
 };
-
-// Defined by group 14
-
-/* returns the relative offset where data begins in a record. */
-#define START_DATA_OFFSET(n_fields) (sizeof(unsigned short)*(n_fields) + sizeof(unsigned short))
-
-/* returns relative offset for where the end offset for the i-th field is stored. */
-#define FIELD_OFFSET(i) (sizeof(unsigned short)*(i) + sizeof(unsigned short))
-
-/* following macro finds the record length given an offset:
-   (*((short *) rec_offset)) - 1 == index offset of last field (2+(number of fields-1))
-   record_offset + FIELD_OFFSET(index of last field) positions pointer to the end offset.
-   The end offset value is the size of the record.
-*/
-
-typedef unsigned short rec_offset_t;
-
-#define RECORD_LENGTH(rec_offset) (*((rec_offset_t *) ((char *) (rec_offset) + (FIELD_OFFSET((*((rec_offset_t *) (rec_offset)))-1)))))
 
 static const unsigned int bytesPerInt = 4;
 static const unsigned int bytesPerReal = 4;
