@@ -24,11 +24,6 @@ typedef struct RID
   unsigned slotNum;
 } RID;
 
-static const unsigned int bytesPerInt = 4;
-static const unsigned int bytesPerReal = 4;
-static const unsigned int bytesPerOffset = 2;
-static const unsigned int bitsInByte = 8;
-
 // Attribute
 typedef enum { TypeInt = 0, TypeReal, TypeVarChar } AttrType;
 
@@ -157,5 +152,13 @@ private:
   /* once a table is open, the file should persist. */
   map<string, PF_FileHandle> open_tables;
 };
+
+#define START_DATA_OFFSET(n_fields) (2*(n_fields) + 2)
+#define FIELD_OFFSET(i) (2*(i) + 2)
+
+static const unsigned int bytesPerInt = 4;
+static const unsigned int bytesPerReal = 4;
+static const unsigned int bytesPerOffset = 2;
+static const unsigned int bitsInByte = 8;
 
 #endif
