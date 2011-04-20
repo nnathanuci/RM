@@ -143,6 +143,7 @@ public:
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
 private:
+  // interface to open_tables map.
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
 
   PF_Manager *pf;
