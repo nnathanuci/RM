@@ -210,7 +210,9 @@ RC RM::deleteTable(const string tableName)
     if(!catalog.count(tableName))
         return -1;
 
-    getAttributes(tableName, attrs);
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
 
     /* delete all fields from catalog_fields. */
     for(unsigned int i = 0; i < attrs.size(); i++)
@@ -227,4 +229,25 @@ RC RM::deleteTable(const string tableName)
     }
 
     return(pf->DestroyFile(tableName.c_str()));
+}
+
+RC insertTuple(const string tableName, const void *data, RID &rid)
+{
+    /* buffer to store record. */
+    static char record[PF_PAGE_SIZE];
+
+    /* attributes to determine data packing format. */
+    vector<Attribute> attrs;
+
+    /* Handle for database. */
+    PF_FileHandle handle;
+
+    getAttributes(tableName, attrs);
+
+   /* unpack data and convert into record format. */
+   
+
+   /* open table for insertion. */
+   if(openTable(tableName, handle))
+      return -1;
 }
