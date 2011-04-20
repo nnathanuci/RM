@@ -159,6 +159,14 @@ private:
 #define START_DATA_OFFSET(n_fields) (2*(n_fields) + 2)
 #define FIELD_OFFSET(i) (2*(i) + 2)
 
+/* following macro finds the record length given an offset:
+   (*((short *) rec_offset)) - 1 == index offset of last field (2+(number of fields-1))
+   record_offset + FIELD_OFFSET(index of last field) positions pointer to the end offset.
+   The end offset value is the size of the record.
+*/
+
+#define RECORD_LENGTH(rec_offset) (*((short *) ((char *) (rec_offset) + (FIELD_OFFSET((*((short *) (rec_offset)))-1)))))
+
 static const unsigned int bytesPerInt = 4;
 static const unsigned int bytesPerReal = 4;
 static const unsigned int bytesPerOffset = 2;
