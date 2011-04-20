@@ -1,5 +1,5 @@
 ## For students: change this path to the root of your code
-CODEROOT = "/home/naveen/cs222/p1/codebase"
+CODEROOT = "../"
 
 #CC = gcc
 CC = g++
