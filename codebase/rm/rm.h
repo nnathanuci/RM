@@ -153,6 +153,8 @@ private:
   map<string, PF_FileHandle> open_tables;
 };
 
+// Defined by group 14
+
 #define START_DATA_OFFSET(n_fields) (2*(n_fields) + 2)
 #define FIELD_OFFSET(i) (2*(i) + 2)
 
