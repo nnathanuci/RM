@@ -168,9 +168,9 @@ private:
    The end offset value is the size of the record.
 */
 
-#define RECORD_LENGTH(rec_offset) (*((short *) ((char *) (rec_offset) + (FIELD_OFFSET((*((short *) (rec_offset)))-1)))))
+typedef unsigned short rec_offset_t;
 
-#define BASE_SLOT_DATA 
+#define RECORD_LENGTH(rec_offset) (*((rec_offset_t *) ((char *) (rec_offset) + (FIELD_OFFSET((*((rec_offset_t *) (rec_offset)))-1)))))
 
 static const unsigned int bytesPerInt = 4;
 static const unsigned int bytesPerReal = 4;
