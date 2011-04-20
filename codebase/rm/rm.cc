@@ -119,7 +119,7 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
         return 0;
     }
 
-    /* Not open, open file. */
+    /* Open file. */
     if(pf->OpenFile(tableName, fileHandle))
         return 1;
 
