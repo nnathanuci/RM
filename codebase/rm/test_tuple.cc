@@ -269,6 +269,7 @@ int main()
     printTuple(data_returned, tuple_size);
 
    
+    cout << "Record Length: " << RECORD_LENGTH(record) << endl;
     FILE *f = fopen("test_tuple.data", "wb+");
     fwrite(record, PF_PAGE_SIZE, 1, f);
     fwrite(tuple, 128, 1, f);
