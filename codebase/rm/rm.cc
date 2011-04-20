@@ -87,17 +87,20 @@ void blank_control_page(char *page)
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
 {
-    unsigned int size = 2; // number of fields marker
+    rec_offset_t size = sizeof(rec_offset_t); /* field offset marker consumes rec_offset_t bytes */
 
-    size += attrs.size() * 2; /* field offset is 2 bytes, XXX: magic constant. */
+    size += attrs.size() * sizeof(rec_offset_t); /* each field consumes rec_offset_t bytes. */
 
     for (unsigned int i = 0; i < attrs.size(); i++)
     {
         switch (attrs[i].type)
         {
             case TypeInt:
+                 size += sizeof(int);
+                 break;
+
             case TypeReal:
-                 size += 4;
+                 size += sizeof(float)
                  break;
 
             case TypeVarChar:
@@ -236,12 +239,12 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
    char *tuple_ptr = (char *) tuple;
    char *record_data_ptr = record;
 
-   unsigned short num_fields = attrs.size();
+   rec_offset_t num_fields = attrs.size();
 
    /* last offset is used as the offset of where to append in the record. Beginning offset after directory.
       data begins after the directory, [2 for num_fields + 2*num_fields]
    */
-   unsigned short last_offset = START_DATA_OFFSET(num_fields);
+   rec_offset_t last_offset = START_DATA_OFFSET(num_fields);
 
    /* record data pointer points to where data can be appended. */
    record_data_ptr += last_offset;
@@ -252,7 +255,7 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
    for(unsigned int i = 0; i < attrs.size(); i++)
    {
        /* field offset address for the attribute. */
-       unsigned short field_offset = FIELD_OFFSET(i);
+       rec_offset_t field_offset = FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -306,6 +309,9 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid)
 {
+    rec_offset_t record_length;
+    unsigned page_num;
+
     /* buffer to store record. */
     static char record[PF_PAGE_SIZE];
 
@@ -322,8 +328,11 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
    /* unpack data and convert into record format. Assumed to be a safe operation. */
    tuple_to_record(data, record, attrs);
 
-   /* find usable data page, rid page number is populated.  */
-   // findBlankPage(handle, rid);
+   /* determine the size of the record. */
+   record_length = RECORD_LENGTH(record);
+
+   /* find usable data page lareg enough to store record, returns page_id. */
+   page_num = findBlankPage(handle, record_length);
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
