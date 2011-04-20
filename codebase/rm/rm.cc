@@ -322,9 +322,15 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
    /* unpack data and convert into record format. Assumed to be a safe operation. */
    tuple_to_record(data, record, attrs);
 
-   /* find usable data page,  */
+   /* find usable data page, rid page number is populated.  */
+   // findBlankPage(handle, rid);
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
       return -1;
+
+   /* insert record */
+
+   /* update free space on page (can determine which control page by rid). */
+   // updatePageSpace(handle, rid);
 }
