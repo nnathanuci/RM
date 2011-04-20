@@ -234,7 +234,7 @@ RC RM::deleteTable(const string tableName)
     return(pf->DestroyFile(tableName.c_str()));
 }
 
-void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs)
+void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs)
 {
    char *tuple_ptr = (char *) tuple;
    char *record_data_ptr = record;
@@ -244,7 +244,7 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
    /* last_offset is the relative offset of where to append data in a record.
       The data begins after the directory, (sizeof(num_fields) + 2*num_fields).
    */
-   rec_offset_t last_offset = START_DATA_OFFSET(num_fields);
+   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
 
    /* record data pointer points to where data can be appended. */
    record_data_ptr += last_offset;
@@ -255,7 +255,7 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
    for(unsigned int i = 0; i < attrs.size(); i++)
    {
        /* field offset address for the attribute. */
-       rec_offset_t field_offset = FIELD_OFFSET(i);
+       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -329,7 +329,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
    tuple_to_record(data, record, attrs);
 
    /* determine the size of the record. */
-   record_length = RECORD_LENGTH(record);
+   record_length = REC_LENGTH(record);
 
    /* find usable data page lareg enough to store record, returns page_id. */
    //page_num = findBlankPage(handle, record_length);
@@ -342,4 +342,6 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
 
    /* update free space on page (can determine which control page by rid). */
    // updatePageSpace(handle, rid);
+
+   return 0;
 }
