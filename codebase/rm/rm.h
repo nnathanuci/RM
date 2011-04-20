@@ -148,6 +148,8 @@ public:
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
 private:
+  RC openTable(const string tableName);
+
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
   map<string, Attribute> catalog_fields;

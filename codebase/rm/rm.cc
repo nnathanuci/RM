@@ -110,6 +110,25 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
     return size;
 }
 
+RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
+{
+    /* check if already open, if so, return file handle. */
+    if(open_tables.count(tableName))
+    {
+        fileHandle = open_tables[tableName];
+        return 0;
+    }
+
+    /* Not open, open file. */
+    if(pf->OpenFile(tableName, fileHandle))
+        return 1;
+
+    /* Keep handle for later use. */
+    open_tables[tableName] = fileHandle;
+
+    return 0;
+}
+
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
 {
     //table_name attribute_name position type max_size nullable
@@ -158,7 +177,8 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     for(unsigned int i = 0; i < attrs.size(); i++)
         catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
 
-    return(pf->CreateFile(tableName.c_str()));
+    /* create file & append a control page. */
+    pf->CreateFile(tableName.c_str());
 }
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
