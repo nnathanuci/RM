@@ -158,7 +158,7 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     for(unsigned int i = 0; i < attrs.size(); i++)
         catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
 
-    return(pf->CreateFile(tableName));
+    return(pf->CreateFile(tableName.c_str()));
 }
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
@@ -189,5 +189,12 @@ RC RM::deleteTable(const string tableName)
     /* delete table. */
     catalog.erase(tableName);
 
-    return(pf->DestroyFile(tableName));
+    /* file is already open, close it, delete it from the open_tables map. */
+    if(open_tables.count(tableName))
+    {
+        pf->CloseFile(open_tables[tableName]);
+        open_tables.erase(tableName);
+    }
+
+    return(pf->DestroyFile(tableName.c_str()));
 }
