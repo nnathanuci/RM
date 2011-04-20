@@ -121,7 +121,7 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
 
     /* Open file. */
     if(pf->OpenFile(tableName, fileHandle))
-        return 1;
+        return -1;
 
     /* Keep handle for later use. */
     open_tables[tableName] = fileHandle;
@@ -131,25 +131,29 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
 {
-    //table_name attribute_name position type max_size nullable
+    /* A blank control page will have all bits set (all pages have free space. */
+    static char blank_ctrl_page[PF_PAGE_SIZE] = { 0xFF };
+
+    /* Handle used to write control page. */
+    PF_FileHandle handle;
 
     /* check table name. */
     if(tableName.find_first_of("/.") != string::npos)
-        return 1;
+        return -1;
 
     /* check attribute name. */
     for(unsigned int i = 0; i < attrs.size(); i++)
         if(attrs[i].name.find_first_of("/.") != string::npos)
-            return 1;
+            return -1;
 
     /* no empty schema. */
     if (attrs.size() == 0)
-        return 1;
+        return -1;
 
     /* no empty varchar attributes. */
     for(unsigned int i = 0; i < attrs.size(); i++)
         if(attrs[i].type == TypeVarChar && attrs[i].length == 0)
-            return 1;
+            return -1;
 
     /* no duplicate attribute names. */
     map<string, int> dupes;
@@ -157,18 +161,18 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     {
         /* entry already exists, duplicate found. */
         if(dupes.count(attrs[i].name))
-            return 1;
+            return -1;
 
         dupes[attrs[i].name] = 1;
     }
 
     /* check schema fits in a page. */
     if(getSchemaSize(attrs) > PF_PAGE_SIZE)
-        return 1;
+        return -1;
 
     /* table exists. */
     if(catalog.count(tableName))
-        return 1;
+        return -1;
 
     /* create table. */
     catalog[tableName] = attrs;
@@ -179,13 +183,18 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
 
     /* create file & append a control page. */
     pf->CreateFile(tableName.c_str());
+
+    if(openTable(tableName, handle))
+        return -1;
+
+    return (handle.AppendPage((void *) blank_ctrl_page));
 }
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
 {
     /* table doesnt exists. */
     if(!catalog.count(tableName))
-        return 1;
+        return -1;
 
     attrs = catalog[tableName];
 
@@ -198,7 +207,7 @@ RC RM::deleteTable(const string tableName)
 
     /* table doesnt exists. */
     if(!catalog.count(tableName))
-        return 1;
+        return -1;
 
     getAttributes(tableName, attrs);
 
