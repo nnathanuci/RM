@@ -13,6 +13,9 @@ using namespace std;
 
 const int success = 0;
 
+#define START_DATA_OFFSET(n_fields) (2*(n_fields) + 2)
+#define FIELD_OFFSET(i) (2*(i) + 2)
+
 void prepareTuple(const int name_length, const string name, const int age, const float height, const int salary, void *buffer, int *tuple_size)
 {
     int offset = 0;
@@ -79,7 +82,7 @@ void transform_tuple_to_record(void *tuple, char *record, const vector<Attribute
    /* last offset is used as the offset of where to append in the record. Beginning offset after directory.
       data begins after the directory, [2 for num_fields + 2*num_fields]
    */
-   unsigned short last_offset = num_fields*2 + 2;
+   unsigned short last_offset = START_DATA_OFFSET(num_fields);
 
    /* record data pointer points to where data can be appended. */
    record_data_ptr += last_offset;
@@ -90,7 +93,7 @@ void transform_tuple_to_record(void *tuple, char *record, const vector<Attribute
    for(int i = 0; i < attrs.size(); i++)
    {
        /* field offset address for the attribute. */
-       unsigned short field_offset = 2 + i*2;
+       unsigned short field_offset = FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -153,13 +156,13 @@ void transform_record_to_tuple(char *record, void *tuple, const vector<Attribute
    memcpy(&num_fields, record, sizeof(num_fields));
 
    /* find beginning of data. */
-   unsigned short last_offset = num_fields*2 + 2;
+   unsigned short last_offset = START_DATA_OFFSET(num_fields);
    record_data_ptr = record + last_offset;
 
    for(int i = 0; i < num_fields; i++)
    {
        /* field offset address for the attribute. */
-       unsigned short field_offset = 2 + i*2;
+       unsigned short field_offset = FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
