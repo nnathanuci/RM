@@ -194,7 +194,7 @@ void transform_record_to_tuple(char *record, void *tuple, const vector<Attribute
            unsigned short length_data;
 
            /* determine length from reading in the field offset, and subtract the last_offset. */
-           memcpy(&length_data, (char *) record + field_offset, sizeof(length_data));
+           memcpy(&length_data, record + field_offset, sizeof(length_data));
            length_data -= last_offset;
 
            /* copy the length data to an int representation. */
