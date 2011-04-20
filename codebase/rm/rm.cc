@@ -238,8 +238,8 @@ void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &a
 
    unsigned short num_fields = attrs.size();
 
-   /* last offset is used as the offset of where to append in the record. Beginning offset after directory.
-      data begins after the directory, [2 for num_fields + 2*num_fields]
+   /* last_offset is the relative offset of where to append data in a record.
+      The data begins after the directory, (sizeof(num_fields) + 2*num_fields).
    */
    unsigned short last_offset = START_DATA_OFFSET(num_fields);
 
