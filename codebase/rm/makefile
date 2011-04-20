@@ -24,5 +24,5 @@ $(CODEROOT)/pf/libpf.a:
 
 .PHONY: clean
 clean:
-	-rm test_tuple rmtest *.a *.o *~
+	-rm test_tuple test_tuple.data rmtest *.a *.o *~
 	$(MAKE) -C $(CODEROOT)/pf clean
