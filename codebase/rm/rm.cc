@@ -77,14 +77,13 @@ RC RM::produceHeader(const vector<Attribute> &attrs, char* header)
 	return 0;
 }
 
-//Max table name     = 128 bytes. SQL
-//Max attribute name = 128 bytes. SQL
-//Int size = 2 bytes
-//nullable = 1 byte
-
-//Catalog representation:
-//table	attribute  position type max_size nullable
-//vchar	vchar	   int 	    int	 int	  char
+/* generates a control page format provided a page buffer. */
+void blank_control_page(char *page)
+{
+   /* all bits are set to indicate each page (12 bits per page) has full free space. */
+   memset(page, 0xFF, PF_PAGE_SIZE-1);
+   page[PF_PAGE_SIZE-1] = 0;
+}
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
 {
@@ -120,7 +119,7 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
     }
 
     /* Open file. */
-    if(pf->OpenFile(tableName, fileHandle))
+    if(pf->OpenFile(tableName.c_str(), fileHandle))
         return -1;
 
     /* Keep handle for later use. */
@@ -131,8 +130,8 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
 {
-    /* A blank control page will have all bits set (all pages have free space. */
-    static char blank_ctrl_page[PF_PAGE_SIZE] = { 0xFF };
+    /* A blank control page will be written as the first page. */
+    char ctrl_page[PF_PAGE_SIZE];
 
     /* Handle used to write control page. */
     PF_FileHandle handle;
@@ -187,7 +186,9 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     if(openTable(tableName, handle))
         return -1;
 
-    return (handle.AppendPage((void *) blank_ctrl_page));
+    /* write blank control page to page 0. */
+    blank_control_page(ctrl_page);
+    return (handle.AppendPage((void *) ctrl_page));
 }
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
