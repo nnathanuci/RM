@@ -319,7 +319,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
     if(getAttributes(tableName, attrs))
         return -1;
 
-   /* unpack data and convert into record format. */
+   /* unpack data and convert into record format. Assumed to be a safe operation. */
    tuple_to_record(data, record, attrs);
 
    /* find usable data page,  */
