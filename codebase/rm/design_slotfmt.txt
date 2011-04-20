@@ -30,6 +30,8 @@ Slotted Page Format:
        * Update slot count
        * Insert slot
        * Insert new record
+         - append to free space
+         - update free space offset
        * Update unused space in control page.
 
   2. There is not enough free space, but enough unused space for a new slot and record.
@@ -69,7 +71,10 @@ Slotted Page Format:
        * Write RID for tuple redirection.
        * Update unused spacein control page.
 
-- When a record is deleted, update offset to 4096 (or some other way to say its deleted), and updateunused space in control page.
+- When a record is deleted:
+  - if slot is the last slot, delete the slot.
+  - if slot is not the last slot, set offset to 0x8000 (most significant bit is 1).
+  - update unused space in control page.
 
 Compaction Algorithm:
 
@@ -114,6 +119,16 @@ Alternative 2:
   * Problem: Cannot identify the adjacent slot number if the packing is
              already contiguous?
 
-  * Solution: Not an issue for compaction. Skip all contiguous records.
-    The fragments are only a concern for only records aligned at the end of
-    the fragment.
+  * Solution: A partial solution is to skip contiguous records. The fragments
+              are only a concern for records adjacent to the end of a fragment.
+
+              However altering a record might require compaction of adjacent
+              records, and in such case, it might be easy to pay the cost of
+              a linear scan to identify the slot.
+
+Free Slot Management;
+  * When inserting a record a slot needs to be acquired.
+    - We can either append a new slot or reuse a slot that was previous deallocated.
+    - In this case, we can represent an implicit linked list, where deleted slots will have the most significant bit set to 1.
+      A 2 byte field will represent the next unused slot. In each unused slot, the next unused slot will be embedded.
+      When inserting, the unused slot number will be used if there's unused slots (again check most significant bit). 
