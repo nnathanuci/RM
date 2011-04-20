@@ -151,6 +151,9 @@ private:
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
   map<string, Attribute> catalog_fields;
+
+  /* once a table is open, the file should persist. */
+  map<string, PF_FileHandle> open_tables;
 };
 
 #endif
