@@ -1,7 +1,7 @@
 
 include ../makefile.inc
 
-all: librm.a rmtest
+all: librm.a rmtest test_tuple
 
 # lib file dependencies
 librm.a: librm.a(rm.o)  # and possibly other .o files
@@ -14,6 +14,9 @@ rmtest.o: rm.h
 # binary dependencies
 rmtest: rmtest.o librm.a $(CODEROOT)/pf/libpf.a
 
+test_tuple: test_tuple.cc rm.h librm.a $(CODEROOT)/pf/libpf.a
+	$(CC) -o test_tuple test_tuple.cc librm.a $(CODEROOT)/pf/libpf.a
+
 # dependencies to compile used libraries
 .PHONY: $(CODEROOT)/pf/libpf.a
 $(CODEROOT)/pf/libpf.a:
@@ -21,5 +24,5 @@ $(CODEROOT)/pf/libpf.a:
 
 .PHONY: clean
 clean:
-	-rm rmtest *.a *.o *~
+	-rm test_tuple rmtest *.a *.o *~
 	$(MAKE) -C $(CODEROOT)/pf clean
