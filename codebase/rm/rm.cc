@@ -231,7 +231,80 @@ RC RM::deleteTable(const string tableName)
     return(pf->DestroyFile(tableName.c_str()));
 }
 
-RC insertTuple(const string tableName, const void *data, RID &rid)
+void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs)
+{
+   char *tuple_ptr = (char *) tuple;
+   char *record_data_ptr = record;
+
+   unsigned short num_fields = attrs.size();
+
+   /* last offset is used as the offset of where to append in the record. Beginning offset after directory.
+      data begins after the directory, [2 for num_fields + 2*num_fields]
+   */
+   unsigned short last_offset = START_DATA_OFFSET(num_fields);
+
+   /* record data pointer points to where data can be appended. */
+   record_data_ptr += last_offset;
+
+   /* write the field count. */
+   memcpy(record, &num_fields, sizeof(num_fields));
+
+   for(unsigned int i = 0; i < attrs.size(); i++)
+   {
+       /* field offset address for the attribute. */
+       unsigned short field_offset = FIELD_OFFSET(i);
+
+       if(attrs[i].type == TypeInt)
+       {
+           /* write the int starting at the last stored field offset. */
+           memcpy(record_data_ptr, tuple_ptr, sizeof(int));
+
+           /* advance pointer in record and tuple. */
+           record_data_ptr += sizeof(int);
+           tuple_ptr += sizeof(int);
+
+           /* determine the new ending offset. */
+           last_offset += sizeof(int);
+       }
+       else if(attrs[i].type == TypeReal)
+       {
+           /* write the float starting at the last stored field offset. */
+           memcpy(record_data_ptr, tuple_ptr, sizeof(float));
+
+           /* advance pointer in record and tuple. */
+           record_data_ptr += sizeof(float);
+           tuple_ptr += sizeof(float);
+
+           /* determine the new ending offset. */
+           last_offset += sizeof(float);
+       }
+       else if(attrs[i].type == TypeVarChar)
+       {
+           int length;
+
+           /* read in the length as int. */
+           memcpy(&length, tuple_ptr, sizeof(length));
+
+           /* advance pointer past the length field in tuple. */
+           tuple_ptr += sizeof(length);
+
+           /* append varchar data to record. */
+           memcpy(record_data_ptr, tuple_ptr, length);
+
+           /* advance pointer in record and tuple. */
+           tuple_ptr += length;
+           record_data_ptr += length;
+
+           /* determine the new ending offset. */
+           last_offset += length;
+       }
+
+       /* write the end address for the field offset. */
+       memcpy(record + field_offset, &last_offset, sizeof(last_offset));
+   }
+}
+
+RC RM::insertTuple(const string tableName, const void *data, RID &rid)
 {
     /* buffer to store record. */
     static char record[PF_PAGE_SIZE];
@@ -242,10 +315,14 @@ RC insertTuple(const string tableName, const void *data, RID &rid)
     /* Handle for database. */
     PF_FileHandle handle;
 
-    getAttributes(tableName, attrs);
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
 
    /* unpack data and convert into record format. */
-   
+   tuple_to_record(data, record, attrs);
+
+   /* find usable data page,  */
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
