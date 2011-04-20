@@ -19,6 +19,9 @@ RM* RM::Instance()
 RM::RM()
 {
     pf = PF_Manager::Instance();
+
+    /* find system catalog file, create an open file handle, and empty map to cache open tables. */
+    /* XXX: put code to open system catalog. */
 }
 
 RM::~RM()
