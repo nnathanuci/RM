@@ -156,8 +156,11 @@ private:
 
 // Defined by group 14
 
-#define START_DATA_OFFSET(n_fields) (2*(n_fields) + 2)
-#define FIELD_OFFSET(i) (2*(i) + 2)
+/* returns the relative offset where data begins in a record. */
+#define START_DATA_OFFSET(n_fields) (sizeof(unsigned short)*(n_fields) + sizeof(unsigned short))
+
+/* returns relative offset for where the end offset for the i-th field is stored. */
+#define FIELD_OFFSET(i) (sizeof(unsigned short)*(i) + sizeof(unsigned short))
 
 /* following macro finds the record length given an offset:
    (*((short *) rec_offset)) - 1 == index offset of last field (2+(number of fields-1))
@@ -166,6 +169,8 @@ private:
 */
 
 #define RECORD_LENGTH(rec_offset) (*((short *) ((char *) (rec_offset) + (FIELD_OFFSET((*((short *) (rec_offset)))-1)))))
+
+#define BASE_SLOT_DATA 
 
 static const unsigned int bytesPerInt = 4;
 static const unsigned int bytesPerReal = 4;
