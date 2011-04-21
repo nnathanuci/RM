@@ -90,7 +90,7 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
             n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
 
         /* read in first control page. */
-        if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+        if(fileHandle.ReadPage(ctrl_page_id, (void *) read_page))
             return -1;
 
         for(unsigned int j = 0; j < n_allocated_pages; j++)
@@ -108,7 +108,7 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
         }
     }
 
-    /* if the number of data pages consume all control pages, then allocate another control page. */ 
+    /* if all data pages consume fill all control pages, then allocate a new control page. */
     if((n_data_pages % CTRL_MAX_PAGES) == 2)
     {
         if(AllocateControlPage(fileHandle))
