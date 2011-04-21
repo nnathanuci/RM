@@ -31,17 +31,59 @@ RM::~RM()
 #define SLOT_MIN_METADATA_SIZE (sizeof(rec_offset_t)*4)
 
 /* generates a control page format provided a page buffer. */
-void blank_control_page(char *page) // {{{
+void blank_control_page(rec_offset_t *page) // {{{
 {
-   /* all bits are set to indicate each page (12 bits per page) has full free space. */
-   //memset(page, 0xFF, PF_PAGE_SIZE-1);
-   //page[PF_PAGE_SIZE-1] = 0;
+    for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
+        page[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
+} // }}}
 
-   /* simplified version. */
-   rec_offset_t *page_ptr = (rec_offset_t *) page;
+RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length, unsigned int &page_id) // {{{
+{
+    /* buffer to read in control page. */
+    static rec_offset_t ctrl_page[CTRL_MAX_PAGES];
 
-   for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
-       page_ptr[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
+    /* get number of allocated pages. */
+    unsigned int n_pages = handle.GetNumberOfPages();
+
+    /* calculate number of control/data pages. */
+    unsigned int n_ctrl_pages = CTRL_NUM_CTRL_PAGES(n_pages);
+    unsigned int n_data_pages = CTRL_NUM_DATA_PAGES(n_pages);
+
+    /* There should always be a control page, since the database creates one. */
+    if(n_pages == 0)
+        return -1;
+
+    /* Layout of Control Structure in Heap:
+       [C] [D * CTRL_MAX_PAGES] [C] [D * CTRL_MAX_PAGES] [C] [D] [D] ...
+       (C: control page, D: data page)
+    */
+    for(unsigned int i = 0; i < n_ctrl_pages; i++)
+    {
+        /* get the page id for i-th control page. */
+        unsigned int ctrl_page_id = CTRL_PAGE_ID(i);
+
+        unsigned int n_allocated_pages;
+
+        /* if we're on the last control page, find how many allocated pages we need to check. If not, then all pages allocated. */
+        if((n_ctrl_pages - 1) == i)
+            n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
+        else
+            n_allocated_pages = CTRL_MAX_PAGES;
+
+        /* read in first control page. */
+        if(handle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+            return -1;
+
+        for(unsigned int j = 0; j < n_allocated_pages; j++)
+        {
+            if(length <= ctrl_page[j])
+                page_id = ctrl_page_id + (j + 1); // page index needs to shift by 1.
+
+            /* update free space now, since it's guaranteed to fit? */
+        }
+    }
+
+    /* didn't find an empty page, allocate a new one. */
 } // }}}
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
@@ -93,7 +135,7 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{{
 {
     /* A blank control page will be written as the first page. */
-    char ctrl_page[PF_PAGE_SIZE];
+    rec_offset_t ctrl_page[CTRL_MAX_PAGES];
 
     /* Handle used to write control page. */
     PF_FileHandle handle;
@@ -338,42 +380,10 @@ void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute
    }
 } // }}}
 
-RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length) // {{{
-{
-    /* get number of allocated pages. */
-    unsigned int num_pages = handle.GetNumberOfPages();
-
-    /* buffer to store the page. */
-    static char ctrl_page[PF_PAGE_SIZE];
-
-    /* Layout of Control Structure in Heap:
-       [C] [D * CTRL_MAX_PAGES] [C] [D * CTRL_MAX_PAGES] ...
-       (C: control page, D: data page) */
-    for(unsigned int ctrl_page_num = 0; ctrl_page_num < num_pages; ctrl_page_num += CTRL_MAX_PAGES+1)
-    {
-        unsigned page_num = ctrl_page_num;
-        rec_offset_t page_size;
-
-        /* read in first control page. */
-        if(handle.ReadPage(ctrl_page_num, (void *) ctrl_page))
-            return -1;
-
-        /* very simplified version of control page, using 16-bit offset values instead of 12-bit. */
-        for(unsigned int page_index = 0; page_index < CTRL_MAX_PAGES && (ctrl_page_num + page_index + 1) < num_pages; page_index++)
-        {
-            rec_offset_t unused_space = ((rec_offset_t *) ctrl_page)[page_index];
-            //if(length >= unsued_space)
-        }
-    }
-
-    /* on last control page. */
-    /* couldn't find a page, append a new page, write control info. */
-} // }}}
-
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
     rec_offset_t record_length;
-    unsigned page_num;
+    unsigned int page_num;
 
     /* buffer to store record. */
     static char record[PF_PAGE_SIZE];
@@ -399,9 +409,12 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
-      return -1;
+       return -1;
 
-   /* insert record */
+   /* find blank page for insertion. */
+   if(findBlankPage(handle, record_length, page_num))
+       return -1;
+ 
 
    /* update free space on page (can determine which control page by rid). */
    // updatePageSpace(handle, rid);
