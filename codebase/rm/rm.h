@@ -53,9 +53,12 @@ typedef unsigned short rec_offset_t;
    To determine number of data pages: (total_num_pages - num_control_pages) = (CTRL_CLUSTER_SIZE*2 - 2) + 1
 */
 
-#define NUM_CONTROL_PAGES(num_pages) (((num_pages) / CTRL_CLUSTER_SIZE) + 1)
+#define CTRL_NUM_CONTROL_PAGES(num_pages) (((num_pages) / CTRL_CLUSTER_SIZE) + 1)
 
-#define NUM_DATA_PAGES(num_pages) ((num_pages) - NUM_CONTROL_PAGES((num_pages)))
+#define CTRL_NUM_DATA_PAGES(num_pages) ((num_pages) - NUM_CONTROL_PAGES((num_pages)))
+
+/* return the page id associated with the i-th control page. */
+#define CTRL_PAGE_ID(i) ((i)*CTRL_CLUSTER_SIZE)
 
 
 // Return code
