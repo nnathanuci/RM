@@ -31,18 +31,20 @@ RM::~RM()
 #define SLOT_MIN_METADATA_SIZE (sizeof(rec_offset_t)*4)
 
 /* generates a control page format provided a page buffer. */
-void blank_control_page(char *page)
+void blank_control_page(char *page) // {{{
 {
    /* all bits are set to indicate each page (12 bits per page) has full free space. */
    //memset(page, 0xFF, PF_PAGE_SIZE-1);
    //page[PF_PAGE_SIZE-1] = 0;
 
    /* simplified version. */
-   for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
-       (rec_offset_t *) page[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
-}
+   rec_offset_t *page_ptr = (rec_offset_t *) page;
 
-unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
+   for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
+       page_ptr[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
+} // }}}
+
+unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 {
     rec_offset_t size = sizeof(rec_offset_t); /* field offset marker consumes rec_offset_t bytes */
 
@@ -67,9 +69,9 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
     }
 
     return size;
-}
+} // }}}
 
-RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
+RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 {
     /* check if already open, if so, return file handle. */
     if(open_tables.count(tableName))
@@ -86,9 +88,9 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle)
     open_tables[tableName] = fileHandle;
 
     return 0;
-}
+} // }}}
 
-RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
+RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{{
 {
     /* A blank control page will be written as the first page. */
     char ctrl_page[PF_PAGE_SIZE];
@@ -149,9 +151,9 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs)
     /* write blank control page to page 0. */
     blank_control_page(ctrl_page);
     return (handle.AppendPage((void *) ctrl_page));
-}
+} // }}}
 
-RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
+RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 {
     /* table doesnt exists. */
     if(!catalog.count(tableName))
@@ -160,9 +162,9 @@ RC RM::getAttributes(const string tableName, vector<Attribute> &attrs)
     attrs = catalog[tableName];
 
     return 0;
-}
+} // }}}
 
-RC RM::deleteTable(const string tableName)
+RC RM::deleteTable(const string tableName) // {{{
 {
     vector<Attribute> attrs;
 
@@ -189,9 +191,9 @@ RC RM::deleteTable(const string tableName)
     }
 
     return(pf->DestroyFile(tableName.c_str()));
-}
+} // }}}
 
-void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs)
+void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs) // {{{
 {
    char *tuple_ptr = (char *) tuple;
    char *record_data_ptr = record;
@@ -262,9 +264,81 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
        /* write the end address for the field offset. */
        memcpy(record + field_offset, &last_offset, sizeof(last_offset));
    }
-}
+} // }}}
 
-RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length)
+void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute> &attrs) // {{{
+{
+   char *tuple_ptr = (char *) tuple;
+   char *record_data_ptr;
+
+   unsigned short num_fields;
+
+   /* read in the number of fields. */
+   memcpy(&num_fields, record, sizeof(num_fields));
+
+   /* find beginning of data. */
+   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
+   record_data_ptr = record + last_offset;
+
+   for(int i = 0; i < num_fields; i++)
+   {
+       /* field offset address for the attribute. */
+       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
+
+       if(attrs[i].type == TypeInt)
+       {
+           /* copy the int to the tuple. */
+           memcpy(tuple_ptr, record_data_ptr, sizeof(int));
+
+           /* advance pointer in record and tuple. */
+           record_data_ptr += sizeof(int);
+           tuple_ptr += sizeof(int);
+
+           /* determine the new ending offset. */
+           last_offset += sizeof(int);
+       }
+       else if(attrs[i].type == TypeReal)
+       {
+           /* copy the float to the tuple. */
+           memcpy(tuple_ptr, record_data_ptr, sizeof(float));
+
+           /* advance pofloater in record and tuple. */
+           record_data_ptr += sizeof(float);
+           tuple_ptr += sizeof(float);
+
+           /* determine the new ending offset. */
+           last_offset += sizeof(float);
+       }
+       else if(attrs[i].type == TypeVarChar)
+       {
+           int length;
+           unsigned short length_data;
+
+           /* determine length from reading in the field offset, and subtract the last_offset. */
+           memcpy(&length_data, record + field_offset, sizeof(length_data));
+           length_data -= last_offset;
+
+           /* copy the length data to an int representation. */
+           length = length_data;
+
+           /* write length data to tuple, and advance to where data should be appended. */
+           memcpy(tuple_ptr, &length, sizeof(length));
+           tuple_ptr += sizeof(length);
+
+           /* append varchar data to tuple from last_offset to last_offset+length. */
+           memcpy(tuple_ptr, record_data_ptr, length);
+
+           /* advance pointer in record and tuple. */
+           tuple_ptr += length;
+           record_data_ptr += length;
+
+           /* determine the new ending offset. */
+           last_offset += length;
+       }
+   }
+} // }}}
+
+RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length) // {{{
 {
     /* get number of allocated pages. */
     unsigned int num_pages = handle.GetNumberOfPages();
@@ -272,9 +346,12 @@ RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length)
     /* buffer to store the page. */
     static char ctrl_page[PF_PAGE_SIZE];
 
-    /* scan each control page, looking for a free page. */
-    for(unsigned int ctrl_page_num = 0; ctrl_page_num < num_pages; ctrl_page_num += CTRL_MAX_PAGES)
+    /* Layout of Control Structure in Heap:
+       [C] [D * CTRL_MAX_PAGES] [C] [D * CTRL_MAX_PAGES] ...
+       (C: control page, D: data page) */
+    for(unsigned int ctrl_page_num = 0; ctrl_page_num < num_pages; ctrl_page_num += CTRL_MAX_PAGES+1)
     {
+        unsigned page_num = ctrl_page_num;
         rec_offset_t page_size;
 
         /* read in first control page. */
@@ -284,16 +361,16 @@ RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length)
         /* very simplified version of control page, using 16-bit offset values instead of 12-bit. */
         for(unsigned int page_index = 0; page_index < CTRL_MAX_PAGES && (ctrl_page_num + page_index + 1) < num_pages; page_index++)
         {
-            rec_offset_t unsued_space = ((rec_offset_t *) ctrl_page)[page_index];
-            if(length >= unsued_space)
+            rec_offset_t unused_space = ((rec_offset_t *) ctrl_page)[page_index];
+            //if(length >= unsued_space)
         }
     }
 
     /* on last control page. */
     /* couldn't find a page, append a new page, write control info. */
-}
+} // }}}
 
-RC RM::insertTuple(const string tableName, const void *data, RID &rid)
+RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
     rec_offset_t record_length;
     unsigned page_num;
@@ -330,4 +407,4 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid)
    // updatePageSpace(handle, rid);
 
    return 0;
-}
+} // }}}
