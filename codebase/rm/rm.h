@@ -36,29 +36,29 @@ typedef unsigned short rec_offset_t;
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
 
 /* number of pages under control for a given control page, plus the control page itself. */
-#define CTRL_CLUSTER_SIZE (1+CTRL_MAX_PAGES)
+#define CTRL_BLOCK_SIZE (1+CTRL_MAX_PAGES)
 
 /* given the total number of pages in a file, determine the number of control and data pages.
 
    An example layout of control and data pages:
 
    [C] [D * CTRL_MAX_PAGES] [C] [D * CTRL_MAX_PAGES] [C] [D]
-   | CTRL_CLUSTER_SIZE    | | CTRL_CLUSTER_SIZE    | [C] [D]
+   | CTRL_BLOCK_SIZE    | | CTRL_BLOCK_SIZE    | [C] [D]
 
-   Total number of pages: CTRL_CLUSTER_SIZE*2 + 2 pages.
+   Total number of pages: CTRL_BLOCK_SIZE*2 + 2 pages.
    The number of control pages: 3
 
-   To determine number of control pages: (total_num_pages / CTRL_CLUSTER_SIZE) + 1 = 3
+   To determine number of control pages: (total_num_pages / CTRL_BLOCK_SIZE) + 1 = 3
 
-   To determine number of data pages: (total_num_pages - num_control_pages) = (CTRL_CLUSTER_SIZE*2 - 2) + 1
+   To determine number of data pages: (total_num_pages - num_control_pages) = (CTRL_BLOCK_SIZE*2 - 2) + 1
 */
 
-#define CTRL_NUM_CTRL_PAGES(num_pages) (((num_pages) / CTRL_CLUSTER_SIZE) + 1)
+#define CTRL_NUM_CTRL_PAGES(num_pages) (((num_pages) <= CTRL_BLOCK_SIZE) ? 1 : (((num_pages) / CTRL_BLOCK_SIZE) + 1))
 
 #define CTRL_NUM_DATA_PAGES(num_pages) ((num_pages) - CTRL_NUM_CTRL_PAGES((num_pages)))
 
 /* return the page id associated with the i-th control page. */
-#define CTRL_PAGE_ID(i) ((i)*CTRL_CLUSTER_SIZE)
+#define CTRL_PAGE_ID(i) ((i)*CTRL_BLOCK_SIZE)
 
 
 // Return code
