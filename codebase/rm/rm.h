@@ -195,7 +195,10 @@ private:
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
 
   /* find blank page given a requested length. */
-  RC findBlankPage(PF_FileHandle &handle, rec_offset_t length, unsigned int &page_id);
+  RC findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id);
+
+  /* allocate & append control page to a given database file. */
+  RC RM::AllocateControlPage(PF_FileHandle &fileHandle);
 
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
@@ -208,10 +211,5 @@ private:
   /* once a table is open, the file should persist. */
   map<string, PF_FileHandle> open_tables;
 };
-
-static const unsigned int bytesPerInt = 4;
-static const unsigned int bytesPerReal = 4;
-static const unsigned int bytesPerOffset = 2;
-static const unsigned int bitsInByte = 8;
 
 #endif
