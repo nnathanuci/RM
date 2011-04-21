@@ -16,29 +16,27 @@ using namespace std;
 // user-defined:
 typedef unsigned short rec_offset_t;
 
-#define REC_BITS_PER_OFFSET (12)
+#define REC_BITS_PER_OFFSET (sizeof(rec_offset_t)*CHAR_BIT)
 
 /* returns the relative offset where data begins in a record. */
-#define REC_START_DATA_OFFSET(n_fields) (sizeof(unsigned short)*(n_fields) + sizeof(unsigned short))
+#define REC_START_DATA_OFFSET(n_fields) (sizeof(rec_offset_t)*(n_fields) + sizeof(rec_offset_t))
 
 /* returns relative offset for where the end offset for the i-th field is stored. */
-#define REC_FIELD_OFFSET(i) (sizeof(unsigned short)*(i) + sizeof(unsigned short))
+#define REC_FIELD_OFFSET(i) (sizeof(rec_offset_t)*(i) + sizeof(rec_offset_t))
 
 /* following macro finds the record length given an offset:
-   (*((short *) rec_offset)) - 1 == index offset of last field (2+(number of fields-1))
-   record_offset + FIELD_OFFSET(index of last field) positions pointer to the end offset.
-   The end offset value is the size of the record.
+   1. (*((short *) start)) - 1 == index offset of last field (2+(number of fields-1))
+   2. start + FIELD_OFFSET(index of last field) positions pointer to the end offset of last field.
+   3. Read in the value to find the end offset value, which is length of the record.
 */
 
-#define REC_LENGTH(rec_offset) (*((rec_offset_t *) ((char *) (rec_offset) + (REC_FIELD_OFFSET((*((rec_offset_t *) (rec_offset)))-1)))))
+#define REC_LENGTH(start) (*((rec_offset_t *) ((char *) (start) + (REC_FIELD_OFFSET((*((rec_offset_t *) (start)))-1)))))
 
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
-#define CTRL_MAX_PAGES_SIMPLE ((PF_PAGE_SIZE*CHAR_BIT)/sizeof(rec_offset_t))
 
 /* number of pages under control for a given control page, plus the control page itself. */
 #define CTRL_CLUSTER_SIZE (1+CTRL_MAX_PAGES)
-#define CTRL_CLUSTER_SIZE_SIMPLE (1+CTRL_MAX_PAGES_SIMPLE)
 
 
 // Return code
