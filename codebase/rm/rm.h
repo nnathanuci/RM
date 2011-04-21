@@ -7,12 +7,16 @@
 #include <ostream>
 #include <iostream>
 #include <map>
+#include <climits>
 
 #include "../pf/pf.h"
 
 using namespace std;
 
 // user-defined:
+typedef unsigned short rec_offset_t;
+
+#define REC_BITS_PER_OFFSET (12)
 
 /* returns the relative offset where data begins in a record. */
 #define REC_START_DATA_OFFSET(n_fields) (sizeof(unsigned short)*(n_fields) + sizeof(unsigned short))
@@ -26,9 +30,10 @@ using namespace std;
    The end offset value is the size of the record.
 */
 
-typedef unsigned short rec_offset_t;
-
 #define REC_LENGTH(rec_offset) (*((rec_offset_t *) ((char *) (rec_offset) + (REC_FIELD_OFFSET((*((rec_offset_t *) (rec_offset)))-1)))))
+
+/* determines number of page offsets stored in a control page. */
+#define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
 
 
 // Return code
