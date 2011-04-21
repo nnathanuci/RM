@@ -1,7 +1,11 @@
 
 include ../makefile.inc
 
-all: librm.a rmtest test_tuple
+all: tags librm.a rmtest test_tuple
+
+tags: *.h *.cc
+	-@rm tags
+	-@ctags *.h *.cc
 
 # lib file dependencies
 librm.a: librm.a(rm.o)  # and possibly other .o files
