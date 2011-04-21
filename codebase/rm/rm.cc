@@ -307,6 +307,29 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
    }
 }
 
+RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length)
+{
+    /* get number of allocated pages. */
+    unsigned int n_pages = handle.GetNumberOfPages();
+
+    /* buffer to store the page. */
+    static char ctrl_page[PF_PAGE_SIZE];
+
+    /* scan each control page, looking for a free page. */
+    for(unsigned int ctrl_page_num = 0; ctrl_page_num < n_pages; ctrl_page_num += CTRL_MAX_PAGES)
+    {
+        unsigned int page_num;
+
+        rec_offset_t page_size;
+
+        /* read in first control page. */
+        if(handle.ReadPage(ctrl_page_num, (void *) ctrl_page))
+            return -1;
+    }
+
+    /* couldn't find a page, append a new page, write control info. */
+}
+
 RC RM::insertTuple(const string tableName, const void *data, RID &rid)
 {
     rec_offset_t record_length;
