@@ -35,6 +35,9 @@ typedef unsigned short rec_offset_t;
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
 
+/* number of pages under control for a given control page, plus the control page itself. */
+#define CTRL_CLUSTER_SIZE (1+CTRL_MAX_PAGES)
+
 
 // Return code
 typedef int RC;
@@ -170,7 +173,7 @@ private:
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
 
   /* find blank page given a requested length. */
-  RC findBlankPage(const PF_FileHandle &handle, rec_offset_t length);
+  RC findBlankPage(PF_FileHandle &handle, rec_offset_t length);
 
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
