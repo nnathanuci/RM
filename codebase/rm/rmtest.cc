@@ -294,13 +294,33 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
 } // }}}
 
-void rmTest_TableMgmt(RM *rm) // {{{
+void rmTest_PageMgmt(RM *rm) // {{{
 {
-    RID r1;
-
     string t1 = "t1";
     vector<Attribute> t1_attrs;
     t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+
+    // test 1: create table, expect 1 control page, no data pages.
+    /* table creation/deletion test. */ // {{{
+
+    cout << "\n[ table creation ]" << endl;
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+
+    // }}}
+
+} // }}}
+
+void rmTest_TableMgmt(RM *rm) // {{{
+{
+    //RID r1;
+
+    //string t1 = "t1";
+    //vector<Attribute> t1_attrs;
+    //t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
 
     /*
         //  Format of the data passed into the function is the following:
@@ -321,6 +341,7 @@ void rmTest()
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
     rmTest_SystemCatalog(rm);
+    rmTest_PageMgmt(rm);
     rmTest_TableMgmt(rm);
 }
 
