@@ -45,6 +45,14 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
+RC RM::AllocateBlankPage(PF_FileHandle &fileHandle) // {{{
+{
+    /* buffer to write blank page. */
+    static char page[PF_PAGE_SIZE] = {0};
+
+    return(fileHandle.AppendPage(page));
+} // }}}
+
 RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id) // {{{
 {
     /* buffer to read in control page. */
@@ -73,13 +81,13 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
         /* get the page id for i-th control page. */
         unsigned int ctrl_page_id = CTRL_PAGE_ID(i);
 
-        unsigned int n_allocated_pages;
+        unsigned int n_allocated_pages = CTRL_MAX_PAGES;
 
-        /* if we're on the last control page, find how many allocated pages we need to check. If not, then all pages allocated. */
+        /* if we're on the last control page, only iterate over remaining allocated pages,
+           since the control page might not control all possible pages.
+        */
         if((n_ctrl_pages - 1) == i)
             n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
-        else
-            n_allocated_pages = CTRL_MAX_PAGES;
 
         /* read in first control page. */
         if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
@@ -111,6 +119,8 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
         /* number of pages increase. */
         n_ctrl_pages++;
         n_pages++;
+
+        /* 
     }
 
     

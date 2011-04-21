@@ -200,6 +200,9 @@ private:
   /* allocate & append control page to a given database file. */
   RC RM::AllocateControlPage(PF_FileHandle &fileHandle);
 
+  /* allocate & append a blank page to a given database file. */
+  RC RM::AllocateBlankPage(PF_FileHandle &fileHandle);
+
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
   void record_to_tuple(char *record, const void *tuple, const vector<Attribute> &attrs);
