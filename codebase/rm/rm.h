@@ -190,12 +190,12 @@ public:
 
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
+  /* find blank page given a requested length. (public for performing tests.) */
+  RC findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id);
+
 private:
   /* interface to open_tables map. */
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
-
-  /* find blank page given a requested length. */
-  RC findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id);
 
   /* allocate & append control page to a given database file. */
   RC AllocateControlPage(PF_FileHandle &fileHandle);
