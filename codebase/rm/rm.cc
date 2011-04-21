@@ -36,7 +36,7 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
     static char page[PF_PAGE_SIZE];
 
     /* overlay buffer as a rec_offset_t array. */
-    rec_offset_t *ctrl_page = page;
+    rec_offset_t *ctrl_page = (rec_offset_t *) page;
 
     /* blank the space for all pages. */
     for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
@@ -59,7 +59,7 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
     static char read_page[PF_PAGE_SIZE];
 
     /* read page as an array of rec_offset_t. */
-    rec_offset_t *ctrl_page = read_page;
+    rec_offset_t *ctrl_page = (rec_offset_t *) read_page;
 
     /* get number of allocated pages. */
     unsigned int n_pages = fileHandle.GetNumberOfPages();
@@ -95,7 +95,7 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
 
         for(unsigned int j = 0; j < n_allocated_pages; j++)
         {
-            /* determine if we have enough space. */
+            /* found a free page, consume the space, and return the page id. */
             if(length <= ctrl_page[j])
             {
                 page_id = ctrl_page_id + (j + 1); // page index needs to shift by 1.
@@ -108,22 +108,25 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
         }
     }
 
-    /* didn't find an empty page, allocate a new one. */
-
     /* if the number of data pages consume all control pages, then allocate another control page. */ 
-    if((n_data_pages % CTRL_MAX_PAGES) == 0)
+    if((n_data_pages % CTRL_MAX_PAGES) == 2)
     {
-        if(rm->AllocateControlPage(fileHandle))
+        if(AllocateControlPage(fileHandle))
             return -1;
 
         /* number of pages increase. */
         n_ctrl_pages++;
         n_pages++;
-
-        /* 
     }
 
-    
+    /* the last page is the index for a newly allocated page. */
+    page_id = n_pages;
+
+    /* allocate a new data page. */
+    if(AllocateBlankPage(fileHandle))
+        return -1;
+
+    return 0;    
 } // }}}
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
@@ -174,9 +177,6 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{{
 {
-    /* A blank control page will be written as the first page. */
-    rec_offset_t ctrl_page[CTRL_MAX_PAGES];
-
     /* Handle used to write control page. */
     PF_FileHandle handle;
 
@@ -231,7 +231,7 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
         return -1;
 
     /* write blank control page to page 0. */
-    return(rm->AllocateControlPage(handle));
+    return(AllocateControlPage(handle));
 } // }}}
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
