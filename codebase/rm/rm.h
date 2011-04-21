@@ -34,9 +34,11 @@ typedef unsigned short rec_offset_t;
 
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
+#define CTRL_MAX_PAGES_SIMPLE ((PF_PAGE_SIZE*CHAR_BIT)/sizeof(rec_offset_t))
 
 /* number of pages under control for a given control page, plus the control page itself. */
 #define CTRL_CLUSTER_SIZE (1+CTRL_MAX_PAGES)
+#define CTRL_CLUSTER_SIZE_SIMPLE (1+CTRL_MAX_PAGES_SIMPLE)
 
 
 // Return code

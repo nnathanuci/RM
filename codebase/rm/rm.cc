@@ -28,12 +28,18 @@ RM::~RM()
 {
 }
 
+#define SLOT_MIN_METADATA_SIZE (sizeof(rec_offset_t)*4)
+
 /* generates a control page format provided a page buffer. */
 void blank_control_page(char *page)
 {
    /* all bits are set to indicate each page (12 bits per page) has full free space. */
-   memset(page, 0xFF, PF_PAGE_SIZE-1);
-   page[PF_PAGE_SIZE-1] = 0;
+   //memset(page, 0xFF, PF_PAGE_SIZE-1);
+   //page[PF_PAGE_SIZE-1] = 0;
+
+   /* simplified version. */
+   for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
+       (rec_offset_t *) page[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
 }
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs)
@@ -261,21 +267,26 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
 RC RM::findBlankPage(PF_FileHandle &handle, rec_offset_t length)
 {
     /* get number of allocated pages. */
-    unsigned int n_pages = handle.GetNumberOfPages();
+    unsigned int num_pages = handle.GetNumberOfPages();
 
     /* buffer to store the page. */
     static char ctrl_page[PF_PAGE_SIZE];
 
     /* scan each control page, looking for a free page. */
-    for(unsigned int ctrl_page_num = 0; ctrl_page_num < n_pages; ctrl_page_num += CTRL_MAX_PAGES)
+    for(unsigned int ctrl_page_num = 0; ctrl_page_num < num_pages; ctrl_page_num += CTRL_MAX_PAGES)
     {
-        unsigned int page_num;
-
         rec_offset_t page_size;
 
         /* read in first control page. */
         if(handle.ReadPage(ctrl_page_num, (void *) ctrl_page))
             return -1;
+
+        /* very simplified version of control page, using 16-bit offset values instead of 12-bit. */
+        for(unsigned int page_index = 0; page_index < CTRL_MAX_PAGES && (ctrl_page_num + page_index + 1) < num_pages; page_index++)
+        {
+            rec_offset_t unsued_space = ((rec_offset_t *) ctrl_page)[page_index];
+            if(length >= unsued_space)
+        }
     }
 
     /* on last control page. */
