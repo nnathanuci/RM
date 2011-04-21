@@ -53,9 +53,9 @@ typedef unsigned short rec_offset_t;
    To determine number of data pages: (total_num_pages - num_control_pages) = (CTRL_CLUSTER_SIZE*2 - 2) + 1
 */
 
-#define CTRL_NUM_CONTROL_PAGES(num_pages) (((num_pages) / CTRL_CLUSTER_SIZE) + 1)
+#define CTRL_NUM_CTRL_PAGES(num_pages) (((num_pages) / CTRL_CLUSTER_SIZE) + 1)
 
-#define CTRL_NUM_DATA_PAGES(num_pages) ((num_pages) - NUM_CONTROL_PAGES((num_pages)))
+#define CTRL_NUM_DATA_PAGES(num_pages) ((num_pages) - CTRL_NUM_CTRL_PAGES((num_pages)))
 
 /* return the page id associated with the i-th control page. */
 #define CTRL_PAGE_ID(i) ((i)*CTRL_CLUSTER_SIZE)
@@ -195,7 +195,7 @@ private:
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
 
   /* find blank page given a requested length. */
-  RC findBlankPage(PF_FileHandle &handle, rec_offset_t length);
+  RC findBlankPage(PF_FileHandle &handle, rec_offset_t length, unsigned int &page_id);
 
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
