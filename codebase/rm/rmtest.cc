@@ -47,6 +47,14 @@ string output_schema(string table_name, vector<Attribute> &attrs) // {{{
     return ss.str();
 } // }}}
 
+void rmTest_CleanUp()
+{
+    const char *files[9] = { "t1", "t2", "t_noschema", "t_duplicate", "t_duplicate2", "t_empty", "t_empty2", "t_overflow1", "t_overflow2" };
+
+    for(int i = 0; i < 9; i++)
+        remove(files[i]);
+}
+
 void rmTest_SystemCatalog(RM *rm) // {{{
 {
     string t1 = "t1";
@@ -296,22 +304,39 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
 void rmTest_PageMgmt(RM *rm) // {{{
 {
+    /* create a blank control page for comparison purposes only */
+    uint16_t blank_ctrl_page[CTRL_MAX_PAGES];
+
+    for(uint16_t i = 0; i < CTRL_MAX_PAGES; i++)
+        blank_ctrl_page[i] = SLOT_MAX_SPACE;
+
+    /* used to read in pages. */
+    void *read_page = malloc(PF_PAGE_SIZE);
+
+    PF_FileHandle handle;
+
     string t1 = "t1";
     vector<Attribute> t1_attrs;
     t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
 
     // test 1: create table, expect 1 control page, no data pages.
-    /* table creation/deletion test. */ // {{{
 
-    cout << "\n[ table creation ]" << endl;
+    cout << "\n[ control page creation/verification test ]" << endl;
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
-    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [create table & control page]" << endl;
+    ZERO_ASSERT(rm->openTable(t1, handle));
+    cout << "PASS: openTable(" << t1 << ") [get handle to table]" << endl;
+
+    assert(handle.GetNumberOfPages() == 1);
+    cout << "PASS: getNumberOfPages(" << t1 << "_handle) == 1" << endl;
+
+    ZERO_ASSERT(handle.ReadPage(0, (void *) read_page));
+    ZERO_ASSERT(memcmp(read_page, blank_ctrl_page, PF_PAGE_SIZE));
 
     ZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
 
-    // }}}
-
+    free(read_page);
 } // }}}
 
 void rmTest_TableMgmt(RM *rm) // {{{
@@ -338,11 +363,14 @@ void rmTest()
 {
     RM *rm = RM::Instance();
 
+    // delete all test files
+    rmTest_CleanUp();
+
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    rmTest_SystemCatalog(rm);
+    //rmTest_SystemCatalog(rm);
     rmTest_PageMgmt(rm);
-    rmTest_TableMgmt(rm);
+    //rmTest_TableMgmt(rm);
 }
 
 int main()
