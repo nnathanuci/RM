@@ -27,7 +27,7 @@ RM::RM()
 
 RM::~RM()
 {
-    
+    closeAllTables();
 }
 
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
@@ -190,7 +190,7 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
     
         /* cache handle for later use. */
         open_tables[tableName] = handle;
-    
+
         return 0;
     }
 } // }}}
@@ -218,6 +218,25 @@ RC RM::closeTable(const string tableName) // {{{
 
     /* table doesn't exist. */
     return -1;
+} // }}}
+
+RC RM::closeAllTables() // {{{
+{
+    /* close each file handle, and free the allocated memory. */
+    for (map<string, PF_FileHandle *>::const_iterator it = open_tables.begin(); it != open_tables.end(); ++it)
+    {
+        PF_FileHandle *handle = it->second;
+
+        if(handle->CloseFile())
+            return -1;
+
+        delete handle;
+    }
+
+    /* all entries are now freed, delete them from the map. */
+    open_tables.clear();
+
+    return 0;
 } // }}}
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{{
@@ -310,12 +329,8 @@ RC RM::deleteTable(const string tableName) // {{{
     /* delete table. */
     catalog.erase(tableName);
 
-    /* file is already open, close it, delete it from the open_tables map. */
-    if(open_tables.count(tableName))
-    {
-        pf->CloseFile(*(open_tables[tableName]));
-        open_tables.erase(tableName);
-    }
+    if(closeTable(tableName))
+        return -1;
 
     return(pf->DestroyFile(tableName.c_str()));
 } // }}}

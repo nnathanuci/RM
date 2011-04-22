@@ -208,8 +208,11 @@ public:
   /* interface to open_tables map. */
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
 
-  /* interface to open_tables map to close tables. Only used in the destructor. */
+  /* interface to open_tables map to close tables; used by deleteTable(). */
   RC closeTable(const string tableName);
+
+  /* close all tables in open_tables. */
+  RC closeAllTables();
 
 private:
 
