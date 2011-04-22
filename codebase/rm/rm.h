@@ -14,15 +14,14 @@
 using namespace std;
 
 // user-defined:
-typedef unsigned short rec_offset_t;
 
-#define REC_BITS_PER_OFFSET (sizeof(rec_offset_t)*CHAR_BIT)
+#define REC_BITS_PER_OFFSET (sizeof(uint16_t)*CHAR_BIT)
 
 /* returns the relative offset where data begins in a record. */
-#define REC_START_DATA_OFFSET(n_fields) (sizeof(rec_offset_t)*(n_fields) + sizeof(rec_offset_t))
+#define REC_START_DATA_OFFSET(n_fields) (sizeof(uint16_t)*(n_fields) + sizeof(uint16_t))
 
 /* returns relative offset for where the end offset for the i-th field is stored. */
-#define REC_FIELD_OFFSET(i) (sizeof(rec_offset_t)*(i) + sizeof(rec_offset_t))
+#define REC_FIELD_OFFSET(i) (sizeof(uint16_t)*(i) + sizeof(uint16_t))
 
 /* following macro finds the record length given an offset:
    1. (*((short *) start)) - 1 == index offset of last field (2+(number of fields-1))
@@ -30,7 +29,7 @@ typedef unsigned short rec_offset_t;
    3. Read in the value to find the end offset value, which is length of the record.
 */
 
-#define REC_LENGTH(start) (*((rec_offset_t *) ((char *) (start) + (REC_FIELD_OFFSET((*((rec_offset_t *) (start)))-1)))))
+#define REC_LENGTH(start) (*((uint16_t *) ((char *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
 
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
@@ -191,7 +190,7 @@ public:
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
   /* find blank page given a requested length. (public for performing tests.) */
-  RC findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id);
+  RC findBlankPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space);
 
 private:
   /* interface to open_tables map. */

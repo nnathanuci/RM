@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -28,7 +29,7 @@ RM::~RM()
 {
 }
 
-#define SLOT_MIN_METADATA_SIZE (sizeof(rec_offset_t)*4)
+#define SLOT_MIN_METADATA_SIZE (sizeof(uint16_t)*4)
 #define NEXT_SLOT_INDEX ((PF_PAGE_SIZE/2) - 2)
 
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
@@ -36,8 +37,8 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
     /* buffer to write control page. */
     static char page[PF_PAGE_SIZE];
 
-    /* overlay buffer as a rec_offset_t array. */
-    rec_offset_t *ctrl_page = (rec_offset_t *) page;
+    /* overlay buffer as a uint16_t array. */
+    uint16_t *ctrl_page = (uint16_t *) page;
 
     /* blank the space for all pages. */
     for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
@@ -50,18 +51,18 @@ RC RM::AllocateBlankPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
     static char page[PF_PAGE_SIZE] = {0};
-    rec_offset_t *slot_page = (rec_offset *) page;
+    uint16_t *slot_page = (uint16_t *) page;
     slot_page[NEXT_SLOT_INDEX] = PF_PAGE_SIZE;
     return(fileHandle.AppendPage(page));
 } // }}}
 
-RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned int &page_id) // {{{
+RC RM::findBlankPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
 {
     /* buffer to read in control page. */
     static char read_page[PF_PAGE_SIZE];
 
-    /* read page as an array of rec_offset_t. */
-    rec_offset_t *ctrl_page = (rec_offset_t *) read_page;
+    /* read page as an array of uint16_t. */
+    uint16_t *ctrl_page = (uint16_t *) read_page;
 
     /* get number of allocated pages. */
     unsigned int n_pages = fileHandle.GetNumberOfPages();
@@ -133,9 +134,9 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, rec_offset_t length, unsigned in
 
 unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 {
-    rec_offset_t size = sizeof(rec_offset_t); /* field offset marker consumes rec_offset_t bytes */
+    uint16_t size = sizeof(uint16_t); /* field offset marker consumes uint16_t bytes */
 
-    size += attrs.size() * sizeof(rec_offset_t); /* each field consumes rec_offset_t bytes. */
+    size += attrs.size() * sizeof(uint16_t); /* each field consumes uint16_t bytes. */
 
     for (unsigned int i = 0; i < attrs.size(); i++)
     {
@@ -281,12 +282,12 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
    char *tuple_ptr = (char *) tuple;
    char *record_data_ptr = record;
 
-   rec_offset_t num_fields = attrs.size();
+   uint16_t num_fields = attrs.size();
 
    /* last_offset is the relative offset of where to append data in a record.
       The data begins after the directory, (sizeof(num_fields) + 2*num_fields).
    */
-   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
+   uint16_t last_offset = REC_START_DATA_OFFSET(num_fields);
 
    /* record data pointer points to where data can be appended. */
    record_data_ptr += last_offset;
@@ -297,7 +298,7 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
    for(unsigned int i = 0; i < attrs.size(); i++)
    {
        /* field offset address for the attribute. */
-       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
+       uint16_t field_offset = REC_FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -354,19 +355,19 @@ void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute
    char *tuple_ptr = (char *) tuple;
    char *record_data_ptr;
 
-   unsigned short num_fields;
+   uint16_t num_fields;
 
    /* read in the number of fields. */
    memcpy(&num_fields, record, sizeof(num_fields));
 
    /* find beginning of data. */
-   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
+   uint16_t last_offset = REC_START_DATA_OFFSET(num_fields);
    record_data_ptr = record + last_offset;
 
    for(int i = 0; i < num_fields; i++)
    {
        /* field offset address for the attribute. */
-       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
+       uint16_t field_offset = REC_FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -395,7 +396,7 @@ void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute
        else if(attrs[i].type == TypeVarChar)
        {
            int length;
-           unsigned short length_data;
+           uint16_t length_data;
 
            /* determine length from reading in the field offset, and subtract the last_offset. */
            memcpy(&length_data, record + field_offset, sizeof(length_data));
@@ -423,8 +424,9 @@ void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
-    rec_offset_t record_length;
+    uint16_t record_length;
     unsigned int page_num;
+    uint16_t space;
 
     /* buffer to store record. */
     static char record[PF_PAGE_SIZE];
@@ -453,7 +455,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
        return -1;
 
    /* find blank page for insertion. */
-   if(findBlankPage(handle, record_length, page_num))
+   if(findBlankPage(handle, record_length, page_num, space))
        return -1;
  
 

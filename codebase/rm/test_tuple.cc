@@ -79,7 +79,7 @@ void transform_tuple_to_record(void *tuple, char *record, const vector<Attribute
    /* last_offset is the relative offset of where to append data in a record.
       The data begins after the directory, (sizeof(num_fields) + 2*num_fields).
    */
-   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
+   uint16_t last_offset = REC_START_DATA_OFFSET(num_fields);
 
    /* record data pointer points to where data can be appended. */
    record_data_ptr += last_offset;
@@ -90,7 +90,7 @@ void transform_tuple_to_record(void *tuple, char *record, const vector<Attribute
    for(unsigned int i = 0; i < attrs.size(); i++)
    {
        /* field offset address for the attribute. */
-       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
+       uint16_t field_offset = REC_FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
@@ -154,13 +154,13 @@ void transform_record_to_tuple(char *record, void *tuple, const vector<Attribute
    memcpy(&num_fields, record, sizeof(num_fields));
 
    /* find beginning of data. */
-   rec_offset_t last_offset = REC_START_DATA_OFFSET(num_fields);
+   uint16_t last_offset = REC_START_DATA_OFFSET(num_fields);
    record_data_ptr = record + last_offset;
 
    for(int i = 0; i < num_fields; i++)
    {
        /* field offset address for the attribute. */
-       rec_offset_t field_offset = REC_FIELD_OFFSET(i);
+       uint16_t field_offset = REC_FIELD_OFFSET(i);
 
        if(attrs[i].type == TypeInt)
        {
