@@ -126,9 +126,67 @@ Alternative 2:
               records, and in such case, it might be easy to pay the cost of
               a linear scan to identify the slot.
 
-Free Slot Management;
-  * When inserting a record a slot needs to be acquired.
-    - We can either append a new slot or reuse a slot that was previous deallocated.
-    - In this case, we can represent an implicit linked list, where deleted slots will have the most significant bit set to 1.
-      A 2 byte field will represent the next unused slot. In each unused slot, the next unused slot will be embedded.
-      When inserting, the unused slot number will be used if there's unused slots (again check most significant bit). 
+Slot Directory Management:
+  * Definitions:
+    - slot:          a slot stores an address value.
+
+    - active slot:   a slot that stores an address of a record on the page.
+
+    - inactive slot: a slot that has no associated record.
+
+    - free space:    the amount of contiguous space from the last record appearing
+                     on the page to the beginning of the last slot in the directory.
+
+    - fragment:      a fragment is space that is unused, but precedes a record on the
+                     page.
+
+    - slot queue:    a slot queue is an implicit FIFO queue, implemented as a linked list,
+                     where inactive slots are used as elements.
+
+  * A slot directory has the following control information:
+    - free_space: stores the address where records can be appended.
+                  Initially 0.
+
+    - next_slot:  stores the first element in the slot queue.
+                  Initially 0, for slot index 0.
+
+    - num_slots:  stores the number of slots, regardless if they're active or inactive.
+                  Initially 1, for slot index 0.
+
+  * an active slot stores an offset < free_space.
+
+  * an inactive slot stores: 4096 + next_slot_id, where next_slot_id is the next slot index in the slot queue.
+    - the value 4096 is an invalid address (this is equivalent to setting the 13th bit)
+
+  * The slot directory expansion procedure:
+    - slot expansion occurs only after a record is inserted, and the slot queue becomes empty.
+    - procedure:
+      - next_slot = 4096 + num_slots
+      - increment next_slot
+      - increase the space of the page by 2
+
+  * The slot directory collapse procedure:
+    - slot collapse occurs only when the following criteria is met:
+      - a record is deleted and occupies the last slot
+      - there exists one or more preceding slots from the last slot that are empty
+
+    - A picture where this criteria holds:
+        [L] [X] [X] [A] [A] [A] [N]
+       
+        Legend: L = last slot, X = inactive slot, A = active slot, N = number of slots
+
+    - A picture where the criteria above doesn't hold:
+        [L] [A] [X] [A] [X] [X] [N]
+
+    - procedure (only in the case a collapse is required):
+      - delete record in last slot, call last slot index last_slot.
+      - walk backwards to find the last active slot, determine it's slot number, call it last_A
+      - if one or more inactive slots between last active slot and the last slot: (last_slot - last_A) > 2
+        - for (i = last_slot-1, i > (last_A+1), i++) /* we ignore last_slot and (last_A+1) */
+             delete i from slot queue
+      - update num_slots = (last_A + 1)+1
+      - slot[num_slots-1] = 4096 + num_slots /* effectively make the last slot in the directory inactive, pointing to a non-existent slot. */
+      - decrease the space of the page by 2*(last_slot - (last_A+1))
+
+      - Deleting from the slot queue might only involve one list traversal to delete multiple items.
+        Just put a filter on the last usable slot index. 
