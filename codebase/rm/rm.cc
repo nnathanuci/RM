@@ -27,6 +27,7 @@ RM::RM()
 
 RM::~RM()
 {
+    
 }
 
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
@@ -163,28 +164,60 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 
 RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 {
-    /* in order to have a handle persist in the map, it needs to be dynamically allocated. */
-    PF_FileHandle *handle = new PF_FileHandle;
-
-    /* check if already open, if so, return file handle. */
     if(open_tables.count(tableName))
     {
         /* open_tables stores a pointer to the handle, need to dereference for object. */
         fileHandle = *(open_tables[tableName]);
+
+        return 0;
+    }
+    else
+    {
+        /* in order to have a handle persist in the map, it needs to be dynamically allocated. */
+        PF_FileHandle *handle = new PF_FileHandle;
+    
+        /* open file and retrieve handle. */
+        if(pf->OpenFile(tableName.c_str(), *handle))
+        {
+            /* deallocate the handle before returning. */
+            delete handle;
+
+            return -1;
+        }
+    
+        /* copy the object. */
+        fileHandle = *handle;
+    
+        /* cache handle for later use. */
+        open_tables[tableName] = handle;
+    
+        return 0;
+    }
+} // }}}
+
+RC RM::closeTable(const string tableName) // {{{
+{
+    /* check to make sure the table handle is cached. */
+    if(open_tables.count(tableName))
+    {
+        /* read in the handle. */
+        PF_FileHandle *handle = open_tables[tableName];
+
+        /* close the handle. */
+        if(handle->CloseFile())
+            return -1;
+
+        /* deallocate the handle. */
+        delete handle;
+
+        /* delete the entry from the map. */
+        open_tables.erase(tableName);
+
         return 0;
     }
 
-    /* Open file. */
-    if(pf->OpenFile(tableName.c_str(), *handle))
-        return -1;
-
-    /* Keep handle for later use. */
-    open_tables[tableName] = handle;
-
-    /* reference the object. */
-    fileHandle = *handle;
-
-    return 0;
+    /* table doesn't exist. */
+    return -1;
 } // }}}
 
 RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{{

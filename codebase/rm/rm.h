@@ -205,9 +205,13 @@ public:
   /* find blank page given a requested length. (public for performing tests.) */
   RC findBlankPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space);
 
-private:
   /* interface to open_tables map. */
   RC openTable(const string tableName, PF_FileHandle &fileHandle);
+
+  /* interface to open_tables map to close tables. Only used in the destructor. */
+  RC closeTable(const string tableName);
+
+private:
 
   /* allocate & append control page to a given database file. */
   RC AllocateControlPage(PF_FileHandle &fileHandle);
@@ -224,7 +228,7 @@ private:
   map<string, Attribute> catalog_fields;
 
   /* once a table is open, the file should persist. */
-  map<string, PF_FileHandle> open_tables;
+  map<string, PF_FileHandle *> open_tables;
 };
 
 #endif
