@@ -165,8 +165,8 @@ Slot Directory Management:
       - increment next_slot
       - increase the space of the page by 2
 
-  * The slot directory shrink procedure:
-    - slot directory shrink occurs only when the following criteria is met:
+  * The slot directory collapse procedure:
+    - slot directory collapse occurs only when the following criteria is met:
       - a record is deleted and occupies the last slot
       - there exists one or more preceding slots from the last slot that are empty
 
@@ -178,7 +178,7 @@ Slot Directory Management:
     - A picture where the criteria above doesn't hold:
         [L] [A] [X] [A] [X] [X] [N]
 
-    - procedure (only in the case a shrink is required):
+    - procedure (only in the case a collapse is required):
       - delete record in last slot, call last slot index last_slot.
       - walk backwards to find the last active slot, determine it's slot number, call it last_A
       - if one or more inactive slots between last active slot and the last slot: (last_slot - last_A) > 2
