@@ -31,6 +31,10 @@ RM::~RM()
 
 #define SLOT_MIN_METADATA_SIZE (sizeof(uint16_t)*4)
 #define NEXT_SLOT_INDEX ((PF_PAGE_SIZE/2) - 2)
+#define SLOT_QUEUE_HEAD ((PF_PAGE_SIZE/2) - 2)
+#define NUM_SLOT_INDEX ((PF_PAGE_SIZE/2) - 3)
+#define GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/2) - 4 - (i))
+#define SLOT_QUEUE_END (4095)
 
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 {
@@ -42,7 +46,7 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 
     /* blank the space for all pages. */
     for(unsigned int i = 0; i < CTRL_MAX_PAGES; i++)
-        ctrl_page[i] = PF_PAGE_SIZE - SLOT_MIN_METADATA_SIZE;
+        ctrl_page[i] = SLOT_MAX_SPACE;
 
     return(fileHandle.AppendPage(page));
 } // }}}
@@ -51,8 +55,13 @@ RC RM::AllocateBlankPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
     static char page[PF_PAGE_SIZE] = {0};
+
     uint16_t *slot_page = (uint16_t *) page;
-    slot_page[NEXT_SLOT_INDEX] = PF_PAGE_SIZE;
+
+    /* all control info. is 0, except num_slots, for 1 unallocated slot. */
+    slot_page[NUM_SLOT_INDEX] = 1;
+    slot_page[GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
+
     return(fileHandle.AppendPage(page));
 } // }}}
 
