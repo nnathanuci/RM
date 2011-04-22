@@ -29,6 +29,7 @@ RM::~RM()
 }
 
 #define SLOT_MIN_METADATA_SIZE (sizeof(rec_offset_t)*4)
+#define NEXT_SLOT_INDEX ((PF_PAGE_SIZE/2) - 2)
 
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 {
@@ -49,7 +50,8 @@ RC RM::AllocateBlankPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
     static char page[PF_PAGE_SIZE] = {0};
-
+    rec_offset_t *slot_page = (rec_offset *) page;
+    slot_page[NEXT_SLOT_INDEX] = PF_PAGE_SIZE;
     return(fileHandle.AppendPage(page));
 } // }}}
 
