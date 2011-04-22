@@ -153,6 +153,15 @@ Slot Directory Management:
     - num_slots:  stores the number of slots, regardless if they're active or inactive.
                   Initially 1, for slot index 0.
 
+  * control information address:
+    - We consider the page as the array: uint16_t page[2048] which is equal to 4096 bytes.
+      - uint16_t free_space = page[2047]
+      - uint16_t next_slot = page[2046]
+      - uint16_t num_slots = page[2045]
+
+      - uint16_t slot0 = page[2044] /* not control information, just showing where slot 0 is stored. */
+       
+
   * an active slot stores an offset < free_space.
 
   * an inactive slot stores: 4096 + next_slot_id, where next_slot_id is the next slot index in the slot queue.
