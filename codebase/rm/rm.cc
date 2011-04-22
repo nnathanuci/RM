@@ -164,35 +164,25 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 
 RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 {
+    /* if table is open, retrieve and return handle. */
     if(open_tables.count(tableName))
     {
         /* open_tables stores a pointer to the handle, need to dereference for object. */
-        fileHandle = *(open_tables[tableName]);
+        fileHandle = open_tables[tableName];
 
         return 0;
     }
-    else
-    {
-        /* in order to have a handle persist in the map, it needs to be dynamically allocated. */
-        PF_FileHandle *handle = new PF_FileHandle;
-    
-        /* open file and retrieve handle. */
-        if(pf->OpenFile(tableName.c_str(), *handle))
-        {
-            /* deallocate the handle before returning. */
-            delete handle;
 
-            return -1;
-        }
-    
-        /* copy the object. */
-        fileHandle = *handle;
-    
-        /* cache handle for later use. */
-        open_tables[tableName] = handle;
+    /* table not open: open table, retrieve and cache handle. */
 
-        return 0;
-    }
+    /* open file and retrieve handle. */
+    if(pf->OpenFile(tableName.c_str(), fileHandle))
+        return -1;
+ 
+    /* cache handle for later use. */
+    open_tables[tableName] = fileHandle;
+ 
+    return 0;
 } // }}}
 
 RC RM::closeTable(const string tableName) // {{{
@@ -201,14 +191,11 @@ RC RM::closeTable(const string tableName) // {{{
     if(open_tables.count(tableName))
     {
         /* read in the handle. */
-        PF_FileHandle *handle = open_tables[tableName];
+        PF_FileHandle handle = open_tables[tableName];
 
         /* close the handle. */
-        if(handle->CloseFile())
+        if(handle.CloseFile())
             return -1;
-
-        /* deallocate the handle. */
-        delete handle;
 
         /* delete the entry from the map. */
         open_tables.erase(tableName);
@@ -222,18 +209,16 @@ RC RM::closeTable(const string tableName) // {{{
 
 RC RM::closeAllTables() // {{{
 {
-    /* close each file handle, and free the allocated memory. */
-    for (map<string, PF_FileHandle *>::const_iterator it = open_tables.begin(); it != open_tables.end(); ++it)
+    /* need a pass to close handles first, and then delete map entries, since iterating must be non-destructive. */
+    for (map<string, PF_FileHandle>::const_iterator it = open_tables.begin(); it != open_tables.end(); ++it)
     {
-        PF_FileHandle *handle = it->second;
+        PF_FileHandle handle = it->second;
 
-        if(handle->CloseFile())
+        if(handle.CloseFile())
             return -1;
-
-        delete handle;
     }
 
-    /* all entries are now freed, delete them from the map. */
+    /* all handles are now closed, delete them from the map. */
     open_tables.clear();
 
     return 0;
