@@ -62,6 +62,16 @@ using namespace std;
 /* maximum available space after allocating space for control fields, and allocation of one empty slot. */
 #define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)
 
+/* slot stuff. */
+#define SLOT_MIN_METADATA_SIZE (sizeof(uint16_t)*4)
+#define NEXT_SLOT_INDEX ((PF_PAGE_SIZE/2) - 2)
+#define SLOT_QUEUE_HEAD ((PF_PAGE_SIZE/2) - 2)
+#define NUM_SLOT_INDEX ((PF_PAGE_SIZE/2) - 3)
+#define GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/2) - 4 - (i))
+#define SLOT_QUEUE_END (4095)
+
+
+
 
 // Return code
 typedef int RC;
