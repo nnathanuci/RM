@@ -59,7 +59,7 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
-RC RM::findBlankPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
+RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
 {
     /* buffer to read in control page. */
     static char read_page[PF_PAGE_SIZE];
@@ -491,14 +491,14 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
    record_length = REC_LENGTH(record);
 
    /* find usable data page lareg enough to store record, returns page_id. */
-   //page_num = findBlankPage(handle, record_length);
+   //page_num = getFreePage(handle, record_length);
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
        return -1;
 
    /* find blank page for insertion. */
-   if(findBlankPage(handle, record_length, page_num, space))
+   if(getFreePage(handle, record_length, page_num, space))
        return -1;
  
 
