@@ -53,7 +53,7 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
 
     /* all fields are 0, except: num_slots, for 1 unallocated slot, and slot 0 stores slot queue end marker. */
     slot_page[NUM_SLOT_INDEX] = 1;
-    slot_page[GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
+    slot_page[GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
 
     return(fileHandle.AppendPage(page));
 } // }}}
@@ -163,19 +163,26 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 
 RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 {
+    /* in order to have a handle persist in the map, it needs to be dynamically allocated. */
+    PF_FileHandle *handle = new PF_FileHandle;
+
     /* check if already open, if so, return file handle. */
     if(open_tables.count(tableName))
     {
-        fileHandle = open_tables[tableName];
+        /* open_tables stores a pointer to the handle, need to dereference for object. */
+        fileHandle = *(open_tables[tableName]);
         return 0;
     }
 
     /* Open file. */
-    if(pf->OpenFile(tableName.c_str(), fileHandle))
+    if(pf->OpenFile(tableName.c_str(), *handle))
         return -1;
 
     /* Keep handle for later use. */
-    open_tables[tableName] = fileHandle;
+    open_tables[tableName] = handle;
+
+    /* reference the object. */
+    fileHandle = *handle;
 
     return 0;
 } // }}}
@@ -230,7 +237,8 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
         catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
 
     /* create file & append a control page. */
-    pf->CreateFile(tableName.c_str());
+    if(pf->CreateFile(tableName.c_str()))
+        return -1;
 
     if(openTable(tableName, handle))
         return -1;
@@ -272,7 +280,7 @@ RC RM::deleteTable(const string tableName) // {{{
     /* file is already open, close it, delete it from the open_tables map. */
     if(open_tables.count(tableName))
     {
-        pf->CloseFile(open_tables[tableName]);
+        pf->CloseFile(*(open_tables[tableName]));
         open_tables.erase(tableName);
     }
 
