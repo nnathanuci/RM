@@ -182,8 +182,11 @@ unsigned PF_FileHandle::GetNumberOfPages()
 {
     long fileSize;
 
-    fseek(handle, 0L, SEEK_END);
-    fileSize = ftell(handle);
+    if(fseek(handle, 0L, SEEK_END) == -1)
+        return -1;
+
+    if((fileSize = ftell(handle)) == -1)
+        return -1;
 
     /* ignore trailing data that's not on a page boundary. */
     return ((unsigned) (fileSize / PF_PAGE_SIZE));
