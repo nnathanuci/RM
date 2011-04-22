@@ -132,7 +132,7 @@ Slot Directory Management:
 
     - active slot:   a slot that stores an address of a record on the page.
 
-    - inactive slot: a slot that has no associated record.
+    - inactive slot: a slot that has no associated record. (value is always > 4096)
 
     - free space:    the amount of contiguous space from the last record appearing
                      on the page to the beginning of the last slot in the directory.
@@ -153,6 +153,8 @@ Slot Directory Management:
     - num_slots:  stores the number of slots, regardless if they're active or inactive.
                   Initially 1, for slot index 0.
 
+    - slot 0: originally inactive, and stores 4095.
+
   * control information address:
     - We consider the page as the array: uint16_t page[2048] which is equal to 4096 bytes.
       - uint16_t free_space = page[2047]
@@ -166,6 +168,7 @@ Slot Directory Management:
 
   * an inactive slot stores: 4096 + next_slot_id, where next_slot_id is the next slot index in the slot queue.
     - the value 4096 is an invalid address (this is equivalent to setting the 13th bit)
+    - the last slot in the slot queue, stores 4095 to represent the tail element of the slot queue.
 
   * The slot directory expansion procedure:
     - slot expansion occurs only after a record is inserted, and the slot queue becomes empty.
@@ -194,7 +197,7 @@ Slot Directory Management:
         - for (i = last_slot-1, i > (last_A+1), i++) /* we ignore last_slot and (last_A+1) */
              delete i from slot queue
       - update num_slots = (last_A + 1)+1
-      - slot[num_slots-1] = 4096 + num_slots /* effectively make the last slot in the directory inactive, pointing to a non-existent slot. */
+      - slot[num_slots-1] = 4095 /* effectively make the last slot in the directory inactive, pointing to a non-existent slot. */
       - decrease the space of the page by 2*(last_slot - (last_A+1))
 
       - Deleting from the slot queue might only involve one list traversal to delete multiple items.
