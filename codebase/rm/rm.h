@@ -59,6 +59,9 @@ using namespace std;
 /* return the page id associated with the i-th control page. */
 #define CTRL_PAGE_ID(i) ((i)*CTRL_BLOCK_SIZE)
 
+/* maximum available space after allocating space for control fields, and allocation of one empty slot. */
+#define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)
+
 
 // Return code
 typedef int RC;
@@ -200,7 +203,7 @@ private:
   RC AllocateControlPage(PF_FileHandle &fileHandle);
 
   /* allocate & append a blank page to a given database file. */
-  RC AllocateBlankPage(PF_FileHandle &fileHandle);
+  RC AllocateDataPage(PF_FileHandle &fileHandle);
 
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);

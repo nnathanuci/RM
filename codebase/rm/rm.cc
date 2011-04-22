@@ -51,14 +51,14 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
-RC RM::AllocateBlankPage(PF_FileHandle &fileHandle) // {{{
+RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
     static char page[PF_PAGE_SIZE] = {0};
 
     uint16_t *slot_page = (uint16_t *) page;
 
-    /* all control info. is 0, except num_slots, for 1 unallocated slot. */
+    /* all fields are 0, except: num_slots, for 1 unallocated slot, and slot 0 stores slot queue end marker. */
     slot_page[NUM_SLOT_INDEX] = 1;
     slot_page[GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
 
@@ -135,7 +135,7 @@ RC RM::findBlankPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &p
     page_id = n_pages;
 
     /* allocate a new data page. */
-    if(AllocateBlankPage(fileHandle))
+    if(AllocateDataPage(fileHandle))
         return -1;
 
     return 0;    
