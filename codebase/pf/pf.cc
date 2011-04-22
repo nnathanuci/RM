@@ -74,8 +74,6 @@ PF_FileHandle::PF_FileHandle()
 
 PF_FileHandle::~PF_FileHandle()
 {
-    /* ignore error, file may have already been closed. */
-    CloseFile();
 }
 
 
