@@ -305,12 +305,11 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
 } // }}}
 
-
 void rmTest_PageMgmt(RM *rm) // {{{
 {
     /* used when getting free pages. */
     unsigned int page_id, ctrl_page_id;
-    uint16_t unused_space;
+    uint16_t unused_space, aux_space;
     uint16_t request;
 
     /* create a blank control page for comparison purposes only */
@@ -355,6 +354,18 @@ void rmTest_PageMgmt(RM *rm) // {{{
 
     ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
     cout << "PASS: getFreePage(" << request << ") [allocates a new page to fit 500 bytes]" << endl;
+
+    /* aux_space == unused space of page. */
+    ZERO_ASSERT(rm->getPageSpace(handle, page_id, aux_space));
+    assert(aux_space == unused_space);
+    cout << "PASS: getPageSpace(" << page_id << ") == " << unused_space << endl;
+
+    ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
+    cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ") == " << unused_space << endl;
+    unused_space -= 500;
+    ZERO_ASSERT(rm->getPageSpace(handle, page_id, aux_space));
+    assert(aux_space == unused_space);
+    cout << "PASS: getPageSpace(" << page_id << ") == " << unused_space << endl;
 
     assert(handle.GetNumberOfPages() == 2);
     cout << "PASS: getNumberOfPages(" << t1 << "_handle) == 2 [ctrl + data page]" << endl;
