@@ -59,13 +59,74 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
+RC RM::decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space) // {{{
+{
+    /* buffer to read in the control page. */
+    uint16_t ctrl_page[CTRL_MAX_PAGES];
+
+    unsigned int ctrl_page_id;
+    uint16_t page_id_offset;
+
+    /* determine the absolute control page id for a given page. */
+    ctrl_page_id = CTRL_GET_CTRL_PAGE(page_id);
+
+    /* get the offset in the control page. */
+    page_id_offset = CTRL_GET_CTRL_PAGE_OFFSET(page_id);
+
+    /* read in control page. */
+    if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+        return -1;
+
+    /* cannot decrease the space if more than what is unused. */
+    if(space > ctrl_page[page_id_offset])
+        return -1;
+
+    /* decrease the space for page on control page. */
+    ctrl_page[page_id_offset] -= space;
+
+    /* write back the control page. */
+    if(fileHandle.WritePage(ctrl_page_id, (void *) ctrl_page))
+        return -1;
+
+    return 0;
+} // }}}
+
+RC RM::increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space) // {{{
+{
+    /* buffer to read in the control page. */
+    uint16_t ctrl_page[CTRL_MAX_PAGES];
+
+    unsigned int ctrl_page_id;
+    uint16_t page_id_offset;
+
+    /* determine the absolute control page id for a given page. */
+    ctrl_page_id = CTRL_GET_CTRL_PAGE(page_id);
+
+    /* get the offset in the control page. */
+    page_id_offset = CTRL_GET_CTRL_PAGE_OFFSET(page_id);
+
+    /* read in control page. */
+    if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+        return -1;
+
+    /* cannot increase space beyond maximum. */
+    if((space + ctrl_page[page_id_offset]) > SLOT_MAX_SPACE)
+        return -1;
+
+    /* increase the space for page on control page. */
+    ctrl_page[page_id_offset] += space;
+
+    /* write back the control page. */
+    if(fileHandle.WritePage(ctrl_page_id, (void *) ctrl_page))
+        return -1;
+
+    return 0;
+} // }}}
+
 RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
 {
-    /* buffer to read in control page. */
-    static char read_page[PF_PAGE_SIZE];
-
-    /* read page as an array of uint16_t. */
-    uint16_t *ctrl_page = (uint16_t *) read_page;
+    /* read control page as an array of uint16_t. */
+    uint16_t ctrl_page[CTRL_MAX_PAGES];
 
     /* get number of allocated pages. */
     unsigned int n_pages = fileHandle.GetNumberOfPages();
@@ -95,8 +156,8 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
         if((n_ctrl_pages - 1) == i)
             n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
 
-        /* read in first control page. */
-        if(fileHandle.ReadPage(ctrl_page_id, (void *) read_page))
+        /* read in control page. */
+        if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
             return -1;
 
         for(unsigned int j = 0; j < n_allocated_pages; j++)
@@ -104,18 +165,19 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
             /* found a free page, consume the space, and return the page id. */
             if(length <= ctrl_page[j])
             {
-                page_id = ctrl_page_id + (j + 1); // page index needs to shift by 1.
+                /* set the page_id with the available space which is returned to the caller. */
+                page_id = ctrl_page_id + (j + 1); // page index is offset by 1.
 
-                /* update free space now, since it's guaranteed to fit? */
-                ctrl_page[j] -= length;
+                /* set the unused_space variable which will be returned to the caller. */
+                unused_space = ctrl_page[j];
 
                 return 0;
             }
         }
     }
 
-    /* if all data pages consume fill all control pages, then allocate a new control page. */
-    if((n_data_pages % CTRL_MAX_PAGES) == 2)
+    /* if all data pages consume fill all control pages, and the last page is not a control page, then allocate a new control page. */
+    if(((n_data_pages % CTRL_MAX_PAGES) == 0) && (CTRL_PAGE_ID(n_ctrl_pages - 1) != (n_pages - 1)))
     {
         if(AllocateControlPage(fileHandle))
             return -1;
@@ -125,12 +187,19 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
         n_pages++;
     }
 
-    /* the last page is the index for a newly allocated page. */
-    page_id = n_pages;
-
     /* allocate a new data page. */
     if(AllocateDataPage(fileHandle))
         return -1;
+
+    /* number of pages increase. */
+    n_data_pages++;
+    n_pages++;
+
+    /* the last page is the index for a newly allocated page. */
+    page_id = n_pages - 1;
+
+    /* unused space is the full page since it is freshly allocated. */
+    unused_space = SLOT_MAX_SPACE;
 
     return 0;    
 } // }}}
@@ -281,7 +350,10 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
         return -1;
 
     /* write blank control page to page 0. */
-    return(AllocateControlPage(handle));
+    if(AllocateControlPage(handle))
+        return -1;
+
+    return 0;
 } // }}}
 
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
