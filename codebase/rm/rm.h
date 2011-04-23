@@ -204,6 +204,9 @@ public:
 
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
+  /* determine the amount of available space in the page. */
+  RC getPageSpace(PF_FileHandle&, unsigned int page_id, uint16_t &unused_space);
+
   /* increase/decrease available space in page routine. */
   RC increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space);
   RC decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space);

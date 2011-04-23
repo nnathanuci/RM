@@ -59,6 +59,39 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
+
+RC RM::getPageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t &unused_space) // {{{
+{
+    /* buffer to read in the control page. */
+    uint16_t ctrl_page[CTRL_MAX_PAGES];
+
+    unsigned int ctrl_page_id;
+    uint16_t page_id_offset;
+
+    /* get number of allocated pages. */
+    unsigned int n_pages = fileHandle.GetNumberOfPages();
+
+    /* make sure the page_id is valid. */
+    if (page_id >= n_pages)
+        return -1;
+
+    /* determine the absolute control page id for a given page. */
+    ctrl_page_id = CTRL_GET_CTRL_PAGE(page_id);
+
+    /* get the offset in the control page. */
+    page_id_offset = CTRL_GET_CTRL_PAGE_OFFSET(page_id);
+
+
+    /* read in control page. */
+    if(fileHandle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+        return -1;
+
+    /* return the unused space in the page. */
+    unused_space = ctrl_page[page_id_offset];
+
+    return 0;
+} // }}}
+
 RC RM::decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space) // {{{
 {
     /* buffer to read in the control page. */
@@ -66,6 +99,14 @@ RC RM::decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16
 
     unsigned int ctrl_page_id;
     uint16_t page_id_offset;
+
+    /* get number of allocated pages. */
+    unsigned int n_pages = fileHandle.GetNumberOfPages();
+
+    /* make sure the page_id is valid. */
+    if (page_id >= n_pages)
+        return -1;
+
 
     /* determine the absolute control page id for a given page. */
     ctrl_page_id = CTRL_GET_CTRL_PAGE(page_id);
@@ -98,6 +139,13 @@ RC RM::increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16
 
     unsigned int ctrl_page_id;
     uint16_t page_id_offset;
+
+    /* get number of allocated pages. */
+    unsigned int n_pages = fileHandle.GetNumberOfPages();
+
+    /* make sure the page_id is valid. */
+    if (page_id >= n_pages)
+        return -1;
 
     /* determine the absolute control page id for a given page. */
     ctrl_page_id = CTRL_GET_CTRL_PAGE(page_id);
