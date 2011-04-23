@@ -211,9 +211,11 @@ Fragment/Free Space Management:
     - fragment:      a fragment is space that is unused, but precedes a record on the
                      page.
 
-  * Fragments are contiguous bytes of space unused by records, but live before the free space offset.
+  * Fragments are contiguous bytes of space unused by records. They only appear before the free space.
 
   * Fragments are created as a side effect of deleting and altering records.
 
   * Fragments are removed when a page is compacted.
+
+  * 
 
