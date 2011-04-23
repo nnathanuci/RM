@@ -15,8 +15,6 @@ using namespace std;
 
 // user-defined:
 
-#define REC_BITS_PER_OFFSET (sizeof(uint16_t)*CHAR_BIT)
-
 /* returns the relative offset where data begins in a record. */
 #define REC_START_DATA_OFFSET(n_fields) (sizeof(uint16_t)*(n_fields) + sizeof(uint16_t))
 
@@ -32,7 +30,7 @@ using namespace std;
 #define REC_LENGTH(start) (*((uint16_t *) ((char *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
 
 /* determines number of page offsets stored in a control page. */
-#define CTRL_MAX_PAGES ((PF_PAGE_SIZE*CHAR_BIT)/REC_BITS_PER_OFFSET)
+#define CTRL_MAX_PAGES ((PF_PAGE_SIZE)/sizeof(uint16_t))
 
 /* number of pages under control for a given control page, plus the control page itself. */
 #define CTRL_BLOCK_SIZE (1+CTRL_MAX_PAGES)
