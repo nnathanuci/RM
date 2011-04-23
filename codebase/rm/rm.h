@@ -57,6 +57,10 @@ using namespace std;
 /* return the page id associated with the i-th control page. */
 #define CTRL_PAGE_ID(i) ((i)*CTRL_BLOCK_SIZE)
 
+/* return the control page id for the given page id. */
+#define CTRL_GET_CTRL_PAGE(pageid) (CTRL_PAGE_ID(((pageid) / CTRL_BLOCK_SIZE)))
+#define CTRL_GET_CTRL_PAGE_OFFSET(pageid) ((pageid) % CTRL_BLOCK_SIZE)
+
 /* maximum available space after allocating space for control fields, and allocation of one empty slot. */
 #define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)
 
@@ -199,6 +203,10 @@ public:
   RC produceHeader(const vector<Attribute> &attrs, char*);
 
   unsigned getSchemaSize(const vector<Attribute> &attrs);
+
+  /* increase/decrease available space in page routine. */
+  RC increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space);
+  RC decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space);
 
   /* find page with available space given the requested length. (public for performing tests.) */
   RC getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space);
