@@ -302,6 +302,9 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
 } // }}}
 
+#define CTRL_GET_CTRL_PAGEID(pageid) ((pageid) / (CTRL_BLOCK_SIZE))
+#define CTRL_GET_CTRL_PAGEOFFSET(pageid) ((pageid) % (CTRL_BLOCK_SIZE))
+
 void rmTest_PageMgmt(RM *rm) // {{{
 {
     /* create a blank control page for comparison purposes only */
@@ -332,6 +335,7 @@ void rmTest_PageMgmt(RM *rm) // {{{
 
     ZERO_ASSERT(handle.ReadPage(0, (void *) read_page));
     ZERO_ASSERT(memcmp(read_page, blank_ctrl_page, PF_PAGE_SIZE));
+    cout << "PASS: read/verify control page 0" << endl;
 
     ZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
