@@ -212,7 +212,16 @@ Fragment/Free Space Management:
                      page.
 
   * Fragments are contiguous bytes of space unused by records. They only appear before the free space.
+    - A few pictures where this holds:
 
+      Consider the page layout as a sequence of bytes:
+
+      [FFFF] [RRRRRRR] [F] [RRRR] [FF] [RRRRRR] [XXXXXXXXXXXX] [Slot Directory/Control Data]
+
+      [RRR] [FF] [RRRR] [FFFff] [RRRRR] [RRRRR] [XXXXXXXX] [Slot Directory/Control Data]
+
+      Legend: F = fragment bytes, R = Record data, X = free space
+ 
   * Fragments are created as a side effect of deleting and altering records.
 
   * Fragments are removed when a page is compacted.
