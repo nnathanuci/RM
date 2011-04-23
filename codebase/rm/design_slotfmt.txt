@@ -202,3 +202,18 @@ Slot Directory Management:
 
       - Deleting from the slot queue might only involve one list traversal to delete multiple items.
         Just put a filter on the last usable slot index. 
+
+Fragment/Free Space Management:
+  Definitions (recall from above:
+    - free space:    the amount of contiguous space from the last record appearing
+                     on the page to the beginning of the last slot in the directory.
+
+    - fragment:      a fragment is space that is unused, but precedes a record on the
+                     page.
+
+  * Fragments are contiguous bytes of space unused by records, but live before the free space offset.
+
+  * Fragments are created as a side effect of deleting and altering records.
+
+  * Fragments are removed when a page is compacted.
+
