@@ -18,6 +18,9 @@
 //#define ZERO_ASSERT(x) ((x) == 0);
 //#define NONZERO_ASSERT(x) ((x) == 1);
 
+#define CTRL_GET_CTRL_PAGEID(pageid) ((pageid) / (CTRL_BLOCK_SIZE))
+#define CTRL_GET_CTRL_PAGEOFFSET(pageid) ((pageid) % (CTRL_BLOCK_SIZE))
+
 using namespace std;
 
 string output_schema(string table_name, vector<Attribute> &attrs) // {{{
@@ -302,11 +305,14 @@ void rmTest_SystemCatalog(RM *rm) // {{{
 
 } // }}}
 
-#define CTRL_GET_CTRL_PAGEID(pageid) ((pageid) / (CTRL_BLOCK_SIZE))
-#define CTRL_GET_CTRL_PAGEOFFSET(pageid) ((pageid) % (CTRL_BLOCK_SIZE))
 
 void rmTest_PageMgmt(RM *rm) // {{{
 {
+    /* used when getting free pages. */
+    unsigned int page_id, ctrl_page_id;
+    uint16_t unused_space;
+    uint16_t request;
+
     /* create a blank control page for comparison purposes only */
     uint16_t blank_ctrl_page[CTRL_MAX_PAGES];
 
@@ -336,6 +342,22 @@ void rmTest_PageMgmt(RM *rm) // {{{
     ZERO_ASSERT(handle.ReadPage(0, (void *) read_page));
     ZERO_ASSERT(memcmp(read_page, blank_ctrl_page, PF_PAGE_SIZE));
     cout << "PASS: read/verify control page 0" << endl;
+
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+
+    cout << "\n[ allocate blank page test (request 500 bytes) ]" << endl;
+    request = 500;
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [create table & control page]" << endl;
+    ZERO_ASSERT(rm->openTable(t1, handle));
+    cout << "PASS: openTable(" << t1 << ") [get handle to table]" << endl;
+
+    ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
+    cout << "PASS: getFreePage(" << request << ") [allocates a new page to fit 500 bytes]" << endl;
+
+    assert(handle.GetNumberOfPages() == 2);
+    cout << "PASS: getNumberOfPages(" << t1 << "_handle) == 2 [ctrl + data page]" << endl;
 
     ZERO_ASSERT(rm->deleteTable(t1));
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
