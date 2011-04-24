@@ -59,23 +59,25 @@ Slotted Page Format:
 
   2. Record size grows. Enough free space available:
      Steps:
-       * Move record to free space.
-       * Update slot offset.
-       * Update unused space in control page.
+       - Move record inside free space, write fragment bytes to old space used by record.
+       - Update free space offset.
+       - Update slot directory.
+       - Update control page for unused space.
 
-  3. Record size grows. Enough unused space:
+  3. Record size grows. Not enough free space, but enough unused space.
      Steps:
-       * Compact page
-       * Move record to free space.
-       * Update slot offset.
-       * Update unused space in control page.
+       - Compact page
+       - Move record inside free space, write fragment bytes to old space used by record.
+       - Update free space offset.
+       - Update slot directory.
+       - Update control page for unused space.
 
   4. Record size grows. Not enough free/unused space:
      Steps:
-       * Find first page with free space.
-       * Insert record.
-       * Write RID for tuple redirection.
-       * Update unused spacein control page.
+       - Get page with free space.
+       - Insert record in new page.
+       - Overwrite record in old page with a tuple redirect. Update unused space with fragment bytes.
+       - Update control page for unused space.
 
 - When a record is deleted:
   - if slot is the last slot, delete the slot.
