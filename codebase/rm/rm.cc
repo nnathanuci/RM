@@ -71,7 +71,7 @@ RC RM::getPageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t &u
     unsigned int n_pages = fileHandle.GetNumberOfPages();
 
     /* make sure the page_id is valid. */
-    if (page_id >= n_pages)
+    if (page_id >= n_pages || CTRL_IS_CTRL_PAGE(page_id))
         return -1;
 
     /* determine the absolute control page id for a given page. */
@@ -103,7 +103,7 @@ RC RM::decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16
     unsigned int n_pages = fileHandle.GetNumberOfPages();
 
     /* make sure the page_id is valid. */
-    if (page_id >= n_pages)
+    if (page_id >= n_pages || CTRL_IS_CTRL_PAGE(page_id))
         return -1;
 
 
@@ -143,7 +143,7 @@ RC RM::increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16
     unsigned int n_pages = fileHandle.GetNumberOfPages();
 
     /* make sure the page_id is valid. */
-    if (page_id >= n_pages)
+    if (page_id >= n_pages || CTRL_IS_CTRL_PAGE(page_id))
         return -1;
 
     /* determine the absolute control page id for a given page. */
