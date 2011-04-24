@@ -63,6 +63,12 @@ using namespace std;
 /* return the offset in the control page for the given page id. Correct off by 1 index */
 #define CTRL_GET_CTRL_PAGE_OFFSET(pageid) (((pageid) % CTRL_BLOCK_SIZE) - 1) 
 
+/* identify if a given page is a control page. */
+#define CTRL_IS_CTRL_PAGE(pageid) (((pageid) % CTRL_BLOCK_SIZE) == 0)
+
+/* identify if a given page is a data page. */
+#define CTRL_IS_DATA_PAGE(pageid) (!(CTRL_IS_CTRL_PAGE((pageid))))
+
 /* maximum available space after allocating space for control fields, and allocation of one empty slot. */
 #define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)
 
