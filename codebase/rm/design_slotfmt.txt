@@ -191,13 +191,13 @@ Slot Directory Management:
       - there exists one or more preceding slots from the last slot that are empty
 
     - A picture where this criteria holds:
-        [L] [X] [X] [A] [A] [A] [N]
-       
+        [L] [X] [X] [A] [A] [A] [N=6] [Next=(4,3)] [Free=...]
+         5   4   3   2   1   0
         Legend: L = last slot, X = inactive slot, A = active slot, N = number of slots
 
     - A picture where the criteria above doesn't hold:
-        [L] [A] [X] [A] [X] [X] [N]
-
+        [L] [A] [X] [A] [X] [X] [N=6] [Next=(0,3,1)] [Free=...]
+         5   4   3   2   1   0 
     - procedure (only in the case a collapse is required):
       - delete record in last slot, call last slot index last_slot.
       - walk backwards to find the last active slot, determine it's slot number, call it last_A
