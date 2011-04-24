@@ -931,6 +931,66 @@ void rmTest_PageMgmt(RM *rm) // {{{
     cout << "PASS: deleteTable(" << t1 << ")" << endl;
     // }}}
 
+    cout << "\n[ invalid decrease/increasePageSpace on non-existent/control pages. ]" << endl; // {{{
+    request = SLOT_MAX_SPACE;
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    n_pages = 1; // start out with 1 control page.
+
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ") [create table & control page]" << endl;
+    ZERO_ASSERT(rm->openTable(t1, handle));
+    cout << "PASS: openTable(" << t1 << ") [get handle to table]" << endl;
+   
+    for(int i = 0; i < 1; i++)
+    {
+        request = SLOT_MAX_SPACE;
+
+        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
+        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        /* since we're using up the entire page, the unused space and request should be equal. */
+        assert(request == unused_space);
+
+        /* getFreePage allocates one whole page for the record. */
+        n_pages++;
+
+        ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
+        unused_space -= SLOT_MAX_SPACE;
+        cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
+
+        ZERO_ASSERT(rm->getPageSpace(handle, page_id, aux_space));
+        assert(aux_space == unused_space);
+        cout << "PASS: getPageSpace(" << page_id << ") == " << unused_space << endl;
+        assert(handle.GetNumberOfPages() == n_pages);
+        cout << "PASS: getNumberOfPages(" << t1 << "_handle) == " << n_pages << endl;
+    }
+
+    cout << "PASS: created and fully consumed " << 1 << " pages" << endl;
+
+    /* verify the total number of pages is 2. */
+    assert(handle.GetNumberOfPages() == 2);
+    cout << "PASS: getNumberOfPages(" << t1 << "_handle) == " << 2 << " [1 ctrl + " << 1 << " data pages]" << endl;
+
+    /* increase page space of page 2 to SLOT_MAX_SPACE-1 bytes. */
+    page_id = 0, request = 100, unused_space = SLOT_MAX_SPACE-100;
+    NONZERO_ASSERT(rm->increasePageSpace(handle, page_id, request));
+    cout << "PASS: increasePageSpace(" << page_id << ", " << request << ") [page is control page]" << endl;
+    NONZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
+    cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ") [page is control page]" << endl;
+    NONZERO_ASSERT(rm->getPageSpace(handle, page_id, aux_space));
+    cout << "PASS: getPageSpace(" << page_id << ") [page is control page]" << endl;
+
+    /* increase page space of page 2 to SLOT_MAX_SPACE-1 bytes. */
+    page_id = 2, request = 100, unused_space = SLOT_MAX_SPACE-100;
+    NONZERO_ASSERT(rm->increasePageSpace(handle, page_id, request));
+    cout << "PASS: increasePageSpace(" << page_id << ", " << request << ") [page doesnt exist]" << endl;
+    NONZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
+    cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ") [page doesnt exist]" << endl;
+    NONZERO_ASSERT(rm->getPageSpace(handle, page_id, aux_space));
+    cout << "PASS: getPageSpace(" << page_id << ") [page doesnt exist]" << endl;
+
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+    // }}}
+
 } // }}}
 
 void rmTest_TableMgmt(RM *rm) // {{{
