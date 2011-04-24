@@ -27,7 +27,7 @@ using namespace std;
    3. Read in the value to find the end offset value, which is length of the record.
 */
 
-#define REC_LENGTH(start) (*((uint16_t *) ((char *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
+#define REC_LENGTH(start) (*((uint16_t *) ((uint8_t *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
 
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((PF_PAGE_SIZE)/sizeof(uint16_t))
@@ -71,9 +71,6 @@ using namespace std;
 #define NUM_SLOT_INDEX ((PF_PAGE_SIZE/2) - 3)
 #define GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/2) - 4 - (i))
 #define SLOT_QUEUE_END (4095)
-
-
-
 
 // Return code
 typedef int RC;
@@ -200,8 +197,6 @@ private:
 // user-defined:
 
 public:
-  RC produceHeader(const vector<Attribute> &attrs, char*);
-
   unsigned getSchemaSize(const vector<Attribute> &attrs);
 
   /* determine the amount of available space in the page. */
@@ -232,8 +227,8 @@ private:
   RC AllocateDataPage(PF_FileHandle &fileHandle);
 
   /* auxillary functions for insertTuple and readTuple. */
-  void tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs);
-  void record_to_tuple(char *record, const void *tuple, const vector<Attribute> &attrs);
+  void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
+  void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
 
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;

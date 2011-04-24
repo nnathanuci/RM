@@ -33,7 +33,7 @@ RM::~RM()
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write control page. */
-    static char page[PF_PAGE_SIZE];
+    static uint8_t page[PF_PAGE_SIZE];
 
     /* overlay buffer as a uint16_t array. */
     uint16_t *ctrl_page = (uint16_t *) page;
@@ -48,7 +48,7 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
-    static char page[PF_PAGE_SIZE] = {0};
+    static uint8_t page[PF_PAGE_SIZE] = {0};
 
     uint16_t *slot_page = (uint16_t *) page;
 
@@ -440,10 +440,10 @@ RC RM::deleteTable(const string tableName) // {{{
     return(pf->DestroyFile(tableName.c_str()));
 } // }}}
 
-void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute> &attrs) // {{{
+void RM::tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs) // {{{
 {
-   char *tuple_ptr = (char *) tuple;
-   char *record_data_ptr = record;
+   uint8_t *tuple_ptr = (uint8_t *) tuple;
+   uint8_t *record_data_ptr = record;
 
    uint16_t num_fields = attrs.size();
 
@@ -513,10 +513,10 @@ void RM::tuple_to_record(const void *tuple, char *record, const vector<Attribute
    }
 } // }}}
 
-void RM::record_to_tuple(char *record, const void *tuple, const vector<Attribute> &attrs) // {{{
+void RM::record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs) // {{{
 {
-   char *tuple_ptr = (char *) tuple;
-   char *record_data_ptr;
+   uint8_t *tuple_ptr = (uint8_t *) tuple;
+   uint8_t *record_data_ptr;
 
    uint16_t num_fields;
 
@@ -592,7 +592,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     uint16_t space;
 
     /* buffer to store record. */
-    static char record[PF_PAGE_SIZE];
+    static uint8_t record[PF_PAGE_SIZE];
 
     /* attributes to determine data packing format. */
     vector<Attribute> attrs;
