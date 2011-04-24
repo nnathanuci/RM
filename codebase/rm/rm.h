@@ -82,6 +82,7 @@ using namespace std;
 
 #define SLOT_QUEUE_HEAD ((PF_PAGE_SIZE/2) - 2)
 #define SLOT_QUEUE_END (4095)
+#define SLOT_INVALID_ADDR (4095)
 
 /* these function macros will index into the slot page, but can use the direct address equivalents above. */
 #define SLOT_GET_NUM_SLOTS(start) ((start)[SLOT_NUM_SLOT_INDEX])
@@ -99,6 +100,7 @@ using namespace std;
 #define SLOT_IS_INACTIVE(offset) (!(SLOT_IS_ACTIVE((offset))))
 
 #define SLOT_FRAGMENT_BYTE (0x80)
+#define SLOT_FRAGMENT_WORD (0xFFFF)
 
 #define SLOT_HASH_SIZE (PF_PAGE_SIZE/2)
 #define SLOT_HASH_FUNC(key) ((key)/2)
@@ -238,7 +240,7 @@ public:
   RC decreasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t space);
 
   /* find page with available space given the requested length. (public for performing tests.) */
-  RC getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space);
+  RC getDataPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space);
 
   /* interface to open_tables map. */
   RC openTable(const string tableName, PF_FileHandle &fileHandle);

@@ -170,7 +170,7 @@ RC RM::increasePageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16
     return 0;
 } // }}}
 
-RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
+RC RM::getDataPage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &page_id, uint16_t &unused_space) // {{{
 {
     /* read control page as an array of uint16_t. */
     uint16_t ctrl_page[CTRL_MAX_PAGES];
@@ -627,21 +627,27 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 
 void RM::debug_data_page(void *page_ptr) // {{{
 {
-    uint16_t last_fragment_byte = PF_PAGE_SIZE; /* points to invalid byte. */
+    uint16_t begin_fragment = SLOT_INVALID_ADDR; /* points to invalid address. */
+    uint16_t begin_record = SLOT_INVALID_ADDR; /* points to invalid address. */
 
     uint16_t offset_to_slot_map[SLOT_HASH_SIZE];
+
+    uint8_t *raw_page = (uint8_t *) page_ptr;
     uint16_t *slot_page = (uint16_t *) page_ptr;
 
     uint16_t num_slots = SLOT_GET_NUM_SLOTS(slot_page);
-    uint16_t free_space = SLOT_GET_FREE_SPACE(slot_page);
+    uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+    uint16_t free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
 
     cout << "[BEGIN PAGE DUMP]" << endl;
-    cout << "free space: " << free_space << endl;
+    cout << "free space: " << free_space_avail << endl;
     cout << "num slots:  " << num_slots << endl;
+
+    /* read in the slot directory, create a map. */
+
     /* invalidate offset map. */ 
     memset(offset_to_slot_map, 0xFF, PF_PAGE_SIZE);
 
-    /* read in the slot directory, create a map. */
     for(uint16_t i = 0; i < SLOT_GET_NUM_SLOTS(slot_page); i++)
     {
         /* slot_index points to the data position in the slot directory relative to the page. */
@@ -661,13 +667,26 @@ void RM::debug_data_page(void *page_ptr) // {{{
         }
     }
 
-    //for(uint16_t i = 0; i < PF_PAGE_SIZE; i++)
-    //{
-    //    if (page_ptr[i] == SLOT_FRAGMENT_BYTE && (last_fragment_byte == )
-    //}
+    /* scan through finding all fragments and records until free space is reached. */
+    for(uint16_t i = 0; i < free_space_offset; i++)
+    {
+        /* reached a fragment word, determine if it's the start of a fragment. */
+        if (raw_page[i] == SLOT_FRAGMENT_WORD)
+        {
+            uint16_t value;
+
+            /* precondition to determine the starting position of a fragment. */
+            if(begin_fragment == SLOT_INVALID_ADDR)
+                begin_fragment = i;
+        }
+        else
+        {
+            /* output fragment. */
+            if(i - begin_fragment > 1)
+                cout << "Fragment [start: " << begin_fragment << "]: length:" << (i - begin_fragment) << endl;
+        }
+    }
 } // }}}
-
-
 
 // functions undefined {{{
 RC RM::deleteTuples(const string tableName) { };
