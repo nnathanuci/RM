@@ -53,8 +53,8 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
     uint16_t *slot_page = (uint16_t *) page;
 
     /* all fields are 0, except: num_slots, for 1 unallocated slot, and slot 0 stores slot queue end marker. */
-    slot_page[NUM_SLOT_INDEX] = 1;
-    slot_page[GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
+    slot_page[SLOT_NUM_SLOT_INDEX] = 1;
+    slot_page[SLOT_GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
 
     return(fileHandle.AppendPage(page));
 } // }}}
@@ -228,8 +228,6 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
         /* number of pages increase. */
         n_ctrl_pages++;
         n_pages++;
-
-        cout << "create control page: " << n_ctrl_pages << endl;
     }
 
     /* allocate a new data page. */
@@ -582,8 +580,10 @@ void RM::record_to_tuple(uint8_t *record, const void *tuple, const vector<Attrib
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
     uint16_t record_length;
-    unsigned int page_num;
-    uint16_t space;
+    unsigned int page_id;
+    uint16_t avail_space;
+
+    uint8_t page[PF_PAGE_SIZE];
 
     /* buffer to store record. */
     static uint8_t record[PF_PAGE_SIZE];
@@ -605,19 +605,90 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
    record_length = REC_LENGTH(record);
 
    /* find usable data page lareg enough to store record, returns page_id. */
-   //page_num = getFreePage(handle, record_length);
+   //page_id = getFreePage(handle, record_length);
 
    /* open table for insertion. */
    if(openTable(tableName, handle))
        return -1;
 
-   /* find blank page for insertion. */
-   if(getFreePage(handle, record_length, page_num, space))
+   /* find data page for insertion, (guaranteed to fit record). */
+   if(getFreePage(handle, record_length, page_id, avail_space))
        return -1;
  
+   if(handle.ReadPage(page_id, page))
+       return -1;
 
+   debug_data_page(page);
    /* update free space on page (can determine which control page by rid). */
    // updatePageSpace(handle, rid);
 
-   return 0;
+   return -1;
 } // }}}
+
+void RM::debug_data_page(void *page_ptr) // {{{
+{
+    uint16_t last_fragment_byte = PF_PAGE_SIZE; /* points to invalid byte. */
+
+    uint16_t offset_to_slot_map[SLOT_HASH_SIZE];
+    uint16_t *slot_page = (uint16_t *) page_ptr;
+
+    uint16_t num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    uint16_t free_space = SLOT_GET_FREE_SPACE(slot_page);
+
+    cout << "[BEGIN PAGE DUMP]" << endl;
+    cout << "free space: " << free_space << endl;
+    cout << "num slots:  " << num_slots << endl;
+    /* invalidate offset map. */ 
+    memset(offset_to_slot_map, 0xFF, PF_PAGE_SIZE);
+
+    /* read in the slot directory, create a map. */
+    for(uint16_t i = 0; i < SLOT_GET_NUM_SLOTS(slot_page); i++)
+    {
+        /* slot_index points to the data position in the slot directory relative to the page. */
+        uint16_t slot_index = SLOT_GET_SLOT_INDEX(i);
+
+        /* slot_directory[i] offset. */
+        uint16_t offset = slot_page[slot_index];
+
+        if(SLOT_IS_ACTIVE(offset))
+        {
+            cout << "slot " << i << ": active" << endl;
+            offset_to_slot_map[SLOT_HASH_FUNC(offset)] = i;
+        }
+        else
+        {
+            cout << "slot " << i << ": inactive" << endl;
+        }
+    }
+
+    //for(uint16_t i = 0; i < PF_PAGE_SIZE; i++)
+    //{
+    //    if (page_ptr[i] == SLOT_FRAGMENT_BYTE && (last_fragment_byte == )
+    //}
+} // }}}
+
+
+
+// functions undefined {{{
+RC RM::deleteTuples(const string tableName) { };
+
+RC RM::deleteTuple(const string tableName, const RID &rid) { return -1; }
+
+// Assume the rid does not change after update
+RC RM::updateTuple(const string tableName, const void *data, const RID &rid) { return -1; }
+
+RC RM::readTuple(const string tableName, const RID &rid, void *data) { return -1; }
+
+RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
+
+RC RM::reorganizePage(const string tableName, const unsigned pageNumber) { return -1; }
+
+// scan returns an iterator to allow the caller to go through the results one by one.
+RC RM::scan(const string tableName, 
+      const vector<string> &attributeNames, // a list of projected attributes
+      RM_ScanIterator &rm_ScanIterator) { return -1; }
+
+void RM::debug_data_page(unsigned int page_id) { return; }
+
+// }}}
+
