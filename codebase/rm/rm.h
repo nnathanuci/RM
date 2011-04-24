@@ -30,7 +30,7 @@ using namespace std;
 #define REC_LENGTH(start) (*((uint16_t *) ((uint8_t *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
 
 /* determines number of page offsets stored in a control page. */
-#define CTRL_MAX_PAGES ((PF_PAGE_SIZE)/sizeof(uint16_t))
+#define CTRL_MAX_PAGES ((int) ((PF_PAGE_SIZE)/sizeof(uint16_t)))
 
 /* number of pages under control for a given control page, plus the control page itself. */
 #define CTRL_BLOCK_SIZE (1+CTRL_MAX_PAGES)
@@ -50,7 +50,7 @@ using namespace std;
    To determine number of data pages: (total_num_pages - num_control_pages) = (CTRL_BLOCK_SIZE*2 - 2) + 1
 */
 
-#define CTRL_NUM_CTRL_PAGES(num_pages) (((num_pages) <= CTRL_BLOCK_SIZE) ? 1 : (((num_pages) / CTRL_BLOCK_SIZE) + 1))
+#define CTRL_NUM_CTRL_PAGES(num_pages) (((num_pages) == 0) ? 0 : (((num_pages) <= CTRL_BLOCK_SIZE) ? 1 : (((num_pages) / CTRL_BLOCK_SIZE) + 1)))
 
 #define CTRL_NUM_DATA_PAGES(num_pages) ((num_pages) - CTRL_NUM_CTRL_PAGES((num_pages)))
 
@@ -59,7 +59,9 @@ using namespace std;
 
 /* return the control page id for the given page id. */
 #define CTRL_GET_CTRL_PAGE(pageid) (CTRL_PAGE_ID(((pageid) / CTRL_BLOCK_SIZE)))
-#define CTRL_GET_CTRL_PAGE_OFFSET(pageid) ((pageid) % CTRL_BLOCK_SIZE)
+
+/* return the offset in the control page for the given page id. Correct off by 1 index */
+#define CTRL_GET_CTRL_PAGE_OFFSET(pageid) (((pageid) % CTRL_BLOCK_SIZE) - 1) 
 
 /* maximum available space after allocating space for control fields, and allocation of one empty slot. */
 #define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)

@@ -59,7 +59,6 @@ RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
     return(fileHandle.AppendPage(page));
 } // }}}
 
-
 RC RM::getPageSpace(PF_FileHandle &fileHandle, unsigned int page_id, uint16_t &unused_space) // {{{
 {
     /* buffer to read in the control page. */
@@ -183,10 +182,6 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
     unsigned int n_ctrl_pages = CTRL_NUM_CTRL_PAGES(n_pages);
     unsigned int n_data_pages = CTRL_NUM_DATA_PAGES(n_pages);
 
-    /* There should always be a control page, since the database creates one. */
-    if(n_pages == 0)
-        return -1;
-
     /* Layout of Control Structure in Heap:
        [C] [D * CTRL_MAX_PAGES] [C] [D * CTRL_MAX_PAGES] [C] [D] [D] ...
        (C: control page, D: data page)
@@ -224,8 +219,8 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
         }
     }
 
-    /* if all data pages consume fill all control pages, and the last page is not a control page, then allocate a new control page. */
-    if(((n_data_pages % CTRL_MAX_PAGES) == 0) && (CTRL_PAGE_ID(n_ctrl_pages - 1) != (n_pages - 1)))
+    /* allocate a control page only if there are no pages, or the last control page is completly full and the last page isn't a control page. */
+    if((n_pages == 0) || ((n_data_pages % CTRL_MAX_PAGES) == 0) && (CTRL_PAGE_ID(n_ctrl_pages - 1) != (n_pages - 1)))
     {
         if(AllocateControlPage(fileHandle))
             return -1;
@@ -233,6 +228,8 @@ RC RM::getFreePage(PF_FileHandle &fileHandle, uint16_t length, unsigned int &pag
         /* number of pages increase. */
         n_ctrl_pages++;
         n_pages++;
+
+        cout << "create control page: " << n_ctrl_pages << endl;
     }
 
     /* allocate a new data page. */
@@ -281,10 +278,11 @@ unsigned int RM::getSchemaSize(const vector<Attribute> &attrs) // {{{
 
 RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 {
+    PF_FileHandle handle;
+
     /* if table is open, retrieve and return handle. */
     if(open_tables.count(tableName))
     {
-        /* open_tables stores a pointer to the handle, need to dereference for object. */
         fileHandle = open_tables[tableName];
 
         return 0;
@@ -293,11 +291,14 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
     /* table not open: open table, retrieve and cache handle. */
 
     /* open file and retrieve handle. */
-    if(pf->OpenFile(tableName.c_str(), fileHandle))
+    if(pf->OpenFile(tableName.c_str(), handle))
         return -1;
  
     /* cache handle for later use. */
-    open_tables[tableName] = fileHandle;
+    open_tables[tableName] = handle;
+
+    /* return handle. */
+    fileHandle = handle;
  
     return 0;
 } // }}}
@@ -320,8 +321,8 @@ RC RM::closeTable(const string tableName) // {{{
         return 0;
     }
 
-    /* table doesn't exist. */
-    return -1;
+    /* table isn't open. */
+    return 0;
 } // }}}
 
 RC RM::closeAllTables() // {{{
@@ -392,13 +393,6 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
 
     /* create file & append a control page. */
     if(pf->CreateFile(tableName.c_str()))
-        return -1;
-
-    if(openTable(tableName, handle))
-        return -1;
-
-    /* write blank control page to page 0. */
-    if(AllocateControlPage(handle))
         return -1;
 
     return 0;
