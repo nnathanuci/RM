@@ -69,16 +69,39 @@ using namespace std;
 /* identify if a given page is a data page. */
 #define CTRL_IS_DATA_PAGE(pageid) (!(CTRL_IS_CTRL_PAGE((pageid))))
 
+/* slot stuff. */
+#define SLOT_MIN_METADATA_SIZE (sizeof(uint16_t)*4)
+
 /* maximum available space after allocating space for control fields, and allocation of one empty slot. */
 #define SLOT_MAX_SPACE (PF_PAGE_SIZE - sizeof(uint16_t)*4)
 
-/* slot stuff. */
-#define SLOT_MIN_METADATA_SIZE (sizeof(uint16_t)*4)
-#define NEXT_SLOT_INDEX ((PF_PAGE_SIZE/2) - 2)
+#define SLOT_FREE_SPACE_INDEX ((PF_PAGE_SIZE/sizeof(uint16_t)) - 1)
+#define SLOT_NEXT_SLOT_INDEX ((PF_PAGE_SIZE/sizeof(uint16_t)) - 2)
+#define SLOT_NUM_SLOT_INDEX ((PF_PAGE_SIZE/sizeof(uint16_t)) - 3)
+#define SLOT_GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/sizeof(uint16_t)) - 4 - (i))
+
 #define SLOT_QUEUE_HEAD ((PF_PAGE_SIZE/2) - 2)
-#define NUM_SLOT_INDEX ((PF_PAGE_SIZE/2) - 3)
-#define GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/2) - 4 - (i))
 #define SLOT_QUEUE_END (4095)
+
+/* these function macros will index into the slot page, but can use the direct address equivalents above. */
+#define SLOT_GET_NUM_SLOTS(start) ((start)[SLOT_NUM_SLOT_INDEX])
+#define SLOT_GET_FREE_SPACE_OFFSET(start) ((start)[SLOT_FREE_SPACE_INDEX])
+#define SLOT_GET_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))])
+
+#define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS((start)) - 1))
+
+/* calculate free space by subtracting the beginning of the last slot with the free space offset. */
+#define SLOT_GET_FREE_SPACE(start) ((sizeof(uint16_t)*SLOT_GET_LAST_SLOT_INDEX(start)) - SLOT_GET_FREE_SPACE_OFFSET(start))
+
+/* SLOT_MAX_SPACE is essentially the beginning of the slot directory in an
+   unused data page. Therefore an active slot has an address before this. */
+#define SLOT_IS_ACTIVE(offset) ((offset) < SLOT_MAX_SPACE)
+#define SLOT_IS_INACTIVE(offset) (!(SLOT_IS_ACTIVE((offset))))
+
+#define SLOT_FRAGMENT_BYTE (0x80)
+
+#define SLOT_HASH_SIZE (PF_PAGE_SIZE/2)
+#define SLOT_HASH_FUNC(key) ((key)/2)
 
 // Return code
 typedef int RC;
@@ -237,6 +260,12 @@ private:
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
   void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
+
+  /* dump the page information given a pointer to the data page. */
+  void debug_data_page(void *page_ptr);
+
+  /* dump the page information given a the page id. */
+  void debug_data_page(unsigned int page_id);
 
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
