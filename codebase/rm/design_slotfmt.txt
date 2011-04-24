@@ -201,7 +201,8 @@ Slot Directory Management:
     - procedure (only in the case a collapse is required):
       - delete record in last slot, call last slot index last_slot.
       - walk backwards to find the last active slot, determine it's slot number, call it last_A
-      - if one or more inactive slots between last active slot and the last slot: (last_slot - last_A) > 2
+      - if one or more inactive slots between last active slot and the last slot:
+        (last_slot - last_A) > 1 [this means theres one slot inbetween last active and last slot]
         - for (i = last_slot-1, i > (last_A+1), i++) /* we ignore last_slot and (last_A+1) */
              delete i from slot queue
       - update num_slots = (last_A + 1)+1
