@@ -13,7 +13,7 @@ RM* RM::Instance()
 {
     if(!_rm)
         _rm = new RM();
-    
+
     return _rm;
 }
 
@@ -33,7 +33,7 @@ RM::~RM()
 RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write control page. */
-    static uint8_t page[PF_PAGE_SIZE];
+    uint8_t page[PF_PAGE_SIZE];
 
     /* overlay buffer as a uint16_t array. */
     uint16_t *ctrl_page = (uint16_t *) page;
@@ -48,7 +48,7 @@ RC RM::AllocateControlPage(PF_FileHandle &fileHandle) // {{{
 RC RM::AllocateDataPage(PF_FileHandle &fileHandle) // {{{
 {
     /* buffer to write blank page. */
-    static uint8_t page[PF_PAGE_SIZE] = {0};
+    uint8_t page[PF_PAGE_SIZE] = {0};
 
     uint16_t *slot_page = (uint16_t *) page;
 
@@ -291,13 +291,13 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
     /* open file and retrieve handle. */
     if(pf->OpenFile(tableName.c_str(), handle))
         return -1;
- 
+
     /* cache handle for later use. */
     open_tables[tableName] = handle;
 
     /* return handle. */
     fileHandle = handle;
- 
+
     return 0;
 } // }}}
 
@@ -638,7 +638,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     int new_slot_flag = 0;
 
     /* buffer to store record. */
-    static uint8_t record[PF_PAGE_SIZE];
+    uint8_t record[PF_PAGE_SIZE];
 
     /* attributes to determine data packing format. */
     vector<Attribute> attrs;
@@ -650,74 +650,93 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if(getAttributes(tableName, attrs))
         return -1;
 
-   /* unpack data and convert into record format. Assumed to be a safe operation. */
-   tuple_to_record(data, record, attrs);
+    /* unpack data and convert into record format. Assumed to be a safe operation. */
+    tuple_to_record(data, record, attrs);
 
-   /* determine the size of the record. */
-   record_length = REC_LENGTH(record);
+    /* determine the size of the record. */
+    record_length = REC_LENGTH(record);
 
-   /* open table for insertion. */
-   if(openTable(tableName, handle))
-       return -1;
+    /* open table for insertion. */
+    if(openTable(tableName, handle))
+        return -1;
 
-   /* find data page for insertion, (guaranteed to fit record). */
-   if(getDataPage(handle, record_length, page_id, avail_space))
-       return -1;
+    /* find data page for insertion, (guaranteed to fit record). */
+    if(getDataPage(handle, record_length, page_id, avail_space))
+        return -1;
 
-   /* update page id to return. */ 
-   rid.pageNum = page_id;
+    /* update page id to return. */ 
+    rid.pageNum = page_id;
 
-   if(handle.ReadPage(page_id, raw_page))
-       return -1;
+    if(handle.ReadPage(page_id, raw_page))
+        return -1;
 
-   debug_data_page(raw_page);
+    debug_data_page(raw_page);
 
-   /* get the free space offset, and determine available space. */
-   free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
-   free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+    /* get the free space offset, and determine available space. */
+    free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
+    free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
 
-   /* It can fit in the free space. Append the record at the free space offset. */
-   if(record_length <= free_space_avail)
-   {
-       uint16_t new_offset;
+    /* It can fit in the free space. Append the record at the free space offset. */
+    if(record_length <= free_space_avail)
+    {
+        uint16_t new_offset;
 
-       /* free space offset must always align on an even boundary (debug check). */
-       if(!(IS_EVEN(free_space_offset)))
-           return -1;
+        /* free space offset must always align on an even boundary (debug check). */
+        if(!(IS_EVEN(free_space_offset)))
+            return -1;
 
-       /* append the record to the page beginning at the free space offset. */
-       memcpy(raw_page + free_space_offset, record, record_length);
+        /* append the record to the page beginning at the free space offset. */
+        memcpy(raw_page + free_space_offset, record, record_length);
 
-       /* calculate new offset, which is the offset after the record is appended at the free space offset. */
-       new_offset = free_space_offset + record_length;
+        /* calculate new offset, which is the offset after the record is appended at the free space offset. */
+        new_offset = free_space_offset + record_length;
 
-       /* align it to even boundary (ignore the one-byte fragment). */
-       if(IS_ODD(new_offset))
-           new_offset++;
+        /* align it to even boundary (ignore the one-byte fragment). */
+        if(IS_ODD(new_offset))
+            new_offset++;
 
-       /* update free space offset (aligned to an even boundary). */
-       slot_page[SLOT_FREE_SPACE_INDEX] = new_offset;
+        /* update free space offset (aligned to an even boundary). */
+        slot_page[SLOT_FREE_SPACE_INDEX] = new_offset;
 
-       /* assign slot from the head of the slot queue. */
-       insert_slot = slot_page[SLOT_NEXT_SLOT_INDEX];
+        /* assign slot from the head of the slot queue. */
+        insert_slot = slot_page[SLOT_NEXT_SLOT_INDEX];
 
-       /* update slot number to return. */
-       rid.slotNum = insert_slot;
+        /* update slot number to return. */
+        rid.slotNum = insert_slot;
 
-       /* activate slot setting it to the old free space offset, where the record was inserted. */
-       new_slot_flag = activateSlot(slot_page, insert_slot, free_space_offset);
-   }
-   else
-   {
-       /* XXX: need to compact, and then insert. */
-   }
+        /* activate slot setting it to the old free space offset, where the record was inserted. */
+        new_slot_flag = activateSlot(slot_page, insert_slot, free_space_offset);
+    }
+    else
+    {
+        /* XXX: need to compact, and then insert. */
+    }
 
-   /* update space in the control page. */
-   decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t));
+    /* update space in the control page. */
+    decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t));
 
-   debug_data_page(raw_page);
+    debug_data_page(raw_page);
 
-   return 0;
+    return 0;
+} // }}}
+
+RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
+{
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* attributes to determine data packing format. */
+    vector<Attribute> attrs;
+
+    /* Handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
+
+    return -1;
 } // }}}
 
 void RM::debug_data_page(uint8_t *raw_page) // {{{
@@ -800,7 +819,6 @@ RC RM::deleteTuple(const string tableName, const RID &rid) { return -1; }
 // Assume the rid does not change after update
 RC RM::updateTuple(const string tableName, const void *data, const RID &rid) { return -1; }
 
-RC RM::readTuple(const string tableName, const RID &rid, void *data) { return -1; }
 
 RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
 
