@@ -577,13 +577,65 @@ void RM::record_to_tuple(uint8_t *record, const void *tuple, const vector<Attrib
    }
 } // }}}
 
+uint16_t RM::activateSlot(uint16_t *slot_page, uint16_t activate_slot_id, uint16_t record_offset) // {{{
+{
+    /* update slot queue head. */
+    if(SLOT_GET_SLOT(slot_page, activate_slot_id) == SLOT_QUEUE_END)
+    {
+        /* reached last slot in the queue, which means we need to allocate a new slot. */
+
+        /* check to see if enough space is available to allocate a new slot. */
+        if(SLOT_GET_FREE_SPACE(slot_page) < sizeof(uint16_t))
+            return 0;
+
+        /* assign new slot index which happens to be the current number of slots. */
+        slot_page[SLOT_NEXT_SLOT_INDEX] = SLOT_GET_NUM_SLOTS(slot_page);
+
+        /* update the number of slots in the directory. */
+        slot_page[SLOT_NUM_SLOT_INDEX]++;
+
+        /* deactivate slot and set it to end of queue marker. */
+        slot_page[SLOT_GET_LAST_SLOT_INDEX(slot_page)] = SLOT_QUEUE_END;
+
+        /* activate slot and update offset. */
+        slot_page[SLOT_GET_SLOT_INDEX(activate_slot_id)] = record_offset;
+
+        /* return 1 to indicate a new slot is created. */
+        return 1;
+    }
+    else
+    {
+        /* the queue has more than 1 element, so we just copy the next element from the last allocated slot. */
+        slot_page[SLOT_NEXT_SLOT_INDEX] = SLOT_GET_INACTIVE_SLOT(slot_page, activate_slot_id);
+
+        /* activate slot and update offset. */
+        slot_page[SLOT_GET_SLOT_INDEX(activate_slot_id)] = record_offset;
+
+        /* no new slots allocated. */
+        return 0;
+    }
+} // }}}
+
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
     uint16_t record_length;
     unsigned int page_id;
+
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* free space management. */
+    uint16_t free_space_offset;
+    uint16_t free_space_avail;
+
+    /* available space of a page. */
     uint16_t avail_space;
 
-    uint8_t page[PF_PAGE_SIZE];
+    /* slot used for insert. */
+    uint16_t insert_slot;
+
+    /* set to 1 if the slot directory is expanded. */
+    int new_slot_flag = 0;
 
     /* buffer to store record. */
     static uint8_t record[PF_PAGE_SIZE];
@@ -604,36 +656,78 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
    /* determine the size of the record. */
    record_length = REC_LENGTH(record);
 
-   /* find usable data page lareg enough to store record, returns page_id. */
-   //page_id = getFreePage(handle, record_length);
-
    /* open table for insertion. */
    if(openTable(tableName, handle))
        return -1;
 
    /* find data page for insertion, (guaranteed to fit record). */
-   if(getFreePage(handle, record_length, page_id, avail_space))
-       return -1;
- 
-   if(handle.ReadPage(page_id, page))
+   if(getDataPage(handle, record_length, page_id, avail_space))
        return -1;
 
-   debug_data_page(page);
-   /* update free space on page (can determine which control page by rid). */
-   // updatePageSpace(handle, rid);
+   /* update page id to return. */ 
+   rid.pageNum = page_id;
 
-   return -1;
+   if(handle.ReadPage(page_id, raw_page))
+       return -1;
+
+   debug_data_page(raw_page);
+
+   /* get the free space offset, and determine available space. */
+   free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
+   free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+
+   /* It can fit in the free space. Append the record at the free space offset. */
+   if(record_length <= free_space_avail)
+   {
+       uint16_t new_offset;
+
+       /* free space offset must always align on an even boundary (debug check). */
+       if(!(IS_EVEN(free_space_offset)))
+           return -1;
+
+       /* append the record to the page beginning at the free space offset. */
+       memcpy(raw_page + free_space_offset, record, record_length);
+
+       /* calculate new offset, which is the offset after the record is appended at the free space offset. */
+       new_offset = free_space_offset + record_length;
+
+       /* align it to even boundary (ignore the one-byte fragment). */
+       if(IS_ODD(new_offset))
+           new_offset++;
+
+       /* update free space offset (aligned to an even boundary). */
+       slot_page[SLOT_FREE_SPACE_INDEX] = new_offset;
+
+       /* assign slot from the head of the slot queue. */
+       insert_slot = slot_page[SLOT_NEXT_SLOT_INDEX];
+
+       /* update slot number to return. */
+       rid.slotNum = insert_slot;
+
+       /* activate slot setting it to the old free space offset, where the record was inserted. */
+       new_slot_flag = activateSlot(slot_page, insert_slot, free_space_offset);
+   }
+   else
+   {
+       /* XXX: need to compact, and then insert. */
+   }
+
+   /* update space in the control page. */
+   decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t));
+
+   debug_data_page(raw_page);
+
+   return 0;
 } // }}}
 
-void RM::debug_data_page(void *page_ptr) // {{{
+void RM::debug_data_page(uint8_t *raw_page) // {{{
 {
-    uint16_t begin_fragment = SLOT_INVALID_ADDR; /* points to invalid address. */
-    uint16_t begin_record = SLOT_INVALID_ADDR; /* points to invalid address. */
+    uint16_t begin_fragment_offset = SLOT_INVALID_ADDR; /* points to invalid address. */
+    uint16_t record_slot = SLOT_INVALID_ADDR; /* points to invalid address. */
 
     uint16_t offset_to_slot_map[SLOT_HASH_SIZE];
 
-    uint8_t *raw_page = (uint8_t *) page_ptr;
-    uint16_t *slot_page = (uint16_t *) page_ptr;
+    uint16_t *slot_page = (uint16_t *) raw_page;
 
     uint16_t num_slots = SLOT_GET_NUM_SLOTS(slot_page);
     uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
@@ -641,6 +735,7 @@ void RM::debug_data_page(void *page_ptr) // {{{
 
     cout << "[BEGIN PAGE DUMP]" << endl;
     cout << "free space: " << free_space_avail << endl;
+    cout << "free space offset: " << free_space_offset << endl;
     cout << "num slots:  " << num_slots << endl;
 
     /* read in the slot directory, create a map. */
@@ -671,19 +766,28 @@ void RM::debug_data_page(void *page_ptr) // {{{
     for(uint16_t i = 0; i < free_space_offset; i++)
     {
         /* reached a fragment word, determine if it's the start of a fragment. */
-        if (raw_page[i] == SLOT_FRAGMENT_WORD)
+        if (slot_page[i] == SLOT_FRAGMENT_WORD)
         {
-            uint16_t value;
-
-            /* precondition to determine the starting position of a fragment. */
-            if(begin_fragment == SLOT_INVALID_ADDR)
-                begin_fragment = i;
+            /* if not set, set the offset to the beginning of the fragment. */
+            if(begin_fragment_offset == SLOT_INVALID_ADDR)
+                begin_fragment_offset = i;
         }
         else
         {
-            /* output fragment. */
-            if(i - begin_fragment > 1)
-                cout << "Fragment [start: " << begin_fragment << "]: length:" << (i - begin_fragment) << endl;
+            /* reached end of fragment, output it. */
+            if(i - begin_fragment_offset > 1)
+            {
+                cout << "Fragment [start: " << begin_fragment_offset << "]: length=" << (i - begin_fragment_offset) << endl;
+
+                /* reset the fragment pointer. */
+                begin_fragment_offset = SLOT_INVALID_ADDR;
+            }
+
+            record_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
+            cout << "Record [slot: " << record_slot << " start: " << i << "]: length=" << REC_LENGTH(raw_page + i) << endl;
+
+            /* skip to end of record aligned on even byte, minus one for the post increment. */
+            i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
         }
     }
 } // }}}
