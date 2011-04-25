@@ -552,6 +552,14 @@ void secA_8(const string tablename)
 }
 
 
+void cleanup()
+{
+    const char *files[3] = { "tbl_employee", "tbl_employee2", "tbl_employee3" };
+
+    for(int i = 0; i < 3; i++)
+        remove(files[i]);
+}
+
 int main()
 {
     string name1 = "Peters";
@@ -560,6 +568,9 @@ int main()
     string name4 = "Veekay";
     string name5 = "Dillon";
     string name6 = "Martin";
+
+    /* cleanup: delete stale tables */
+    cleanup();
 
     // Basic Functions
     cout << "Test Basic Functions..." << endl;
