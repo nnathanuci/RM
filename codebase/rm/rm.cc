@@ -670,8 +670,6 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if(handle.ReadPage(page_id, raw_page))
         return -1;
 
-    debug_data_page(raw_page);
-
     /* get the free space offset, and determine available space. */
     free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
     free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
@@ -712,8 +710,13 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
         /* XXX: need to compact, and then insert. */
     }
 
+    /* write page back. */
+    if(handle.WritePage(page_id, (void *) raw_page))
+        return -1;
+
     /* update space in the control page. */
-    decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t));
+    if(decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t)))
+        return -1;
 
     debug_data_page(raw_page);
 
@@ -726,16 +729,41 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
     uint8_t raw_page[PF_PAGE_SIZE];
     uint16_t *slot_page = (uint16_t *) raw_page;
 
+    /* offset in page where the record begins. */
+    uint16_t record_offset;
+
     /* attributes to determine data packing format. */
     vector<Attribute> attrs;
 
-    /* Handle for database. */
+    /* handle for database. */
     PF_FileHandle handle;
 
     /* retrieve table attributes. */
     if(getAttributes(tableName, attrs))
         return -1;
 
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(rid.pageNum, raw_page))
+        return -1;
+
+    /* get the beginning offset from the slot associated with the record. */
+    record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
+
+    /* copy record to tuple buffer. */
+    record_to_tuple(raw_page + record_offset, data, attrs);
+
+    /* we're done, wasn't that hard? */
+    return 0;
+} // }}}
+
+
+RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
+{
+    
     return -1;
 } // }}}
 
@@ -809,10 +837,12 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
             i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
         }
     }
+
+    cout << "[END PAGE DUMP]" << endl;
 } // }}}
 
 // functions undefined {{{
-RC RM::deleteTuples(const string tableName) { };
+RC RM::deleteTuples(const string tableName) { return -1; };
 
 RC RM::deleteTuple(const string tableName, const RID &rid) { return -1; }
 
@@ -832,4 +862,3 @@ RC RM::scan(const string tableName,
 void RM::debug_data_page(unsigned int page_id) { return; }
 
 // }}}
-

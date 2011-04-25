@@ -15,6 +15,10 @@ using namespace std;
 
 // user-defined:
 
+#define IS_EVEN(x) (((x) % 2) == 0)
+
+#define IS_ODD(x) (((x) % 2) == 1)
+
 /* returns the relative offset where data begins in a record. */
 #define REC_START_DATA_OFFSET(n_fields) (sizeof(uint16_t)*(n_fields) + sizeof(uint16_t))
 
@@ -81,13 +85,14 @@ using namespace std;
 #define SLOT_GET_SLOT_INDEX(i) ((PF_PAGE_SIZE/sizeof(uint16_t)) - 4 - (i))
 
 #define SLOT_QUEUE_HEAD ((PF_PAGE_SIZE/2) - 2)
-#define SLOT_QUEUE_END (4095)
-#define SLOT_INVALID_ADDR (4095)
+#define SLOT_QUEUE_END (0x0FFF)
+#define SLOT_INVALID_ADDR (0x0FFF)
 
 /* these function macros will index into the slot page, but can use the direct address equivalents above. */
 #define SLOT_GET_NUM_SLOTS(start) ((start)[SLOT_NUM_SLOT_INDEX])
 #define SLOT_GET_FREE_SPACE_OFFSET(start) ((start)[SLOT_FREE_SPACE_INDEX])
 #define SLOT_GET_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))])
+#define SLOT_GET_INACTIVE_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))] - PF_PAGE_SIZE)
 
 #define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS((start)) - 1))
 
@@ -99,7 +104,7 @@ using namespace std;
 #define SLOT_IS_ACTIVE(offset) ((offset) < SLOT_MAX_SPACE)
 #define SLOT_IS_INACTIVE(offset) (!(SLOT_IS_ACTIVE((offset))))
 
-#define SLOT_FRAGMENT_BYTE (0x80)
+#define SLOT_FRAGMENT_BYTE (0xFF)
 #define SLOT_FRAGMENT_WORD (0xFFFF)
 
 #define SLOT_HASH_SIZE (PF_PAGE_SIZE/2)
@@ -263,8 +268,14 @@ private:
   void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
   void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
 
+  /* activateSlot returns the number of new slots created to activate a given slot in the directory. [max slots created is 1] */
+  uint16_t activateSlot(uint16_t *slot_page, uint16_t slot_id, uint16_t record_offset);
+
+  /* deactivateSlot returns the number of slots deleted to activate a given slot in the directory. [number of slots deleted is unbounded] */
+  uint16_t deactivateSlot(uint16_t *slot_page, uint16_t slot_id);
+
   /* dump the page information given a pointer to the data page. */
-  void debug_data_page(void *page_ptr);
+  void debug_data_page(uint8_t *raw_page);
 
   /* dump the page information given a the page id. */
   void debug_data_page(unsigned int page_id);
