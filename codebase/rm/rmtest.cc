@@ -353,8 +353,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     ZERO_ASSERT(rm->openTable(t1, handle));
     cout << "PASS: openTable(" << t1 << ") [get handle to table]" << endl;
 
-    ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-    cout << "PASS: getFreePage(" << request << ") [allocates a new page to fit 500 bytes]" << endl;
+    ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+    cout << "PASS: getDataPage(" << request << ") [allocates a new page to fit 500 bytes]" << endl;
 
     /* no changes made to control page, yet. */
     for(int i=0; i < CTRL_MAX_PAGES; i++) scratch_ctrl_page[i] = SLOT_MAX_SPACE;
@@ -402,12 +402,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        if (verbose) { cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl; }
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        if (verbose) { cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl; }
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
@@ -444,12 +444,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        if (verbose) { cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl; }
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        if (verbose) { cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl; }
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         /* a new control page is created every 2048 records. */
@@ -492,12 +492,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        if (verbose) { cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl; }
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        if (verbose) { cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl; }
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
@@ -537,8 +537,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 100;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -554,8 +554,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 220;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -571,8 +571,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 60;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -588,8 +588,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 50;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -618,12 +618,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        if (verbose) { cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl; }
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        if (verbose) { cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl; }
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         /* a new control page is created every 2048 records. */
@@ -667,8 +667,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 100;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -684,8 +684,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 220;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -701,8 +701,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 60;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -718,8 +718,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 50;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -748,12 +748,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        if (verbose) { cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl; }
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        if (verbose) { cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl; }
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         /* a new control page is created every 2048 records. */
@@ -797,8 +797,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 100;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -814,8 +814,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 220;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -831,8 +831,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 60;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -848,8 +848,8 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = 50;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
         cout << "PASS: decreasePageSpace(" << page_id << ", " << request << ")" << endl;
@@ -878,12 +878,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
@@ -944,12 +944,12 @@ void rmTest_PageMgmt(RM *rm) // {{{
     {
         request = SLOT_MAX_SPACE;
 
-        ZERO_ASSERT(rm->getFreePage(handle, request, page_id, unused_space));
-        cout << "PASS: getFreePage(" << request << ") [page_id: " << page_id << "]" << endl;
+        ZERO_ASSERT(rm->getDataPage(handle, request, page_id, unused_space));
+        cout << "PASS: getDataPage(" << request << ") [page_id: " << page_id << "]" << endl;
         /* since we're using up the entire page, the unused space and request should be equal. */
         assert(request == unused_space);
 
-        /* getFreePage allocates one whole page for the record. */
+        /* getDataPage allocates one whole page for the record. */
         n_pages++;
 
         ZERO_ASSERT(rm->decreasePageSpace(handle, page_id, request));
