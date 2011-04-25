@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <cassert>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -760,10 +761,75 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
     return 0;
 } // }}}
 
-
 RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
 {
-    
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* offset in page where the record begins. */
+    uint16_t record_offset;
+    uint16_t record_length;
+
+    /* offset aligned to the nearest even byte. */
+    uint16_t record_end_offset;
+
+    /* beginning offset of free space. */
+    uint16_t free_space_offset;
+
+     /* attributes to determine data packing format. */
+    vector<Attribute> attrs;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(rid.pageNum, raw_page))
+        return -1;
+
+    /* get the beginning offset of free space. */
+    free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+
+    /* get the beginning offset from the slot associated with the record. */
+    record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
+    record_length = REC_LENGTH(raw_page + record_offset);
+
+    /* determine ending offset of record. */
+    record_end_offset = record_offset + record_length;
+
+    /* align to the nearest even byte, we know this isn't in use since records/free space begins on even bytes. */
+    record_end_offset += IS_ODD(record_end_offset) ? 1 : 0;
+
+    cout << "GOING TO DELETE: " << record_length << " at slot: " << rid.slotNum << " with offset: " << record_offset << " to " << record_end_offset << endl;
+
+    debug_data_page(raw_page);
+
+    /* two cases: record to delete is last page that appears on record preceding free space, or earlier which leaves a fragment. */
+    if(record_end_offset == free_space_offset)
+    {
+        cout << "record_end == free_off" << endl;
+        /* move the free space pointer to beginning of deleted record. */
+        free_space_offset = record_offset;
+        slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset;
+
+        /* record is now deleted. */
+    }
+    else
+    {
+        /* write mark all bytes as fragments from beginning to aligned ending boundary. */
+        memset(raw_page + record_offset, SLOT_FRAGMENT_BYTE, record_end_offset - record_offset);
+    }
+
+    debug_data_page(raw_page);
+
     return -1;
 } // }}}
 
@@ -777,13 +843,15 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
     uint16_t *slot_page = (uint16_t *) raw_page;
 
     uint16_t num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    uint16_t next_slot = slot_page[SLOT_NEXT_SLOT_INDEX];
     uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
     uint16_t free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
 
     cout << "[BEGIN PAGE DUMP]" << endl;
-    cout << "free space: " << free_space_avail << endl;
     cout << "free space offset: " << free_space_offset << endl;
-    cout << "num slots:  " << num_slots << endl;
+    cout << "free space avail:  " << free_space_avail << endl;
+    cout << "next slot:         " << next_slot << endl;
+    cout << "num slots:         " << num_slots << endl;
 
     /* read in the slot directory, create a map. */
 
@@ -800,20 +868,25 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
 
         if(SLOT_IS_ACTIVE(offset))
         {
-            cout << "slot " << i << ": active" << endl;
+            cout << "slot " << i << ": active, offset: " << SLOT_GET_SLOT(slot_page, i) << endl;
             offset_to_slot_map[SLOT_HASH_FUNC(offset)] = i;
         }
         else
         {
-            cout << "slot " << i << ": inactive" << endl;
+            cout << "slot " << i << ": inactive, next: " << SLOT_GET_INACTIVE_SLOT(slot_page, i) << endl;
         }
     }
 
-    /* scan through finding all fragments and records until free space is reached. */
+    /* scan through finding all fragments and records until free space is reached.
+       reading the slot page as 2 byte chunks, so it's expected that free_space_offset is aligned on even boundary.
+    */
+
+    assert(IS_EVEN(free_space_offset));
+    
     for(uint16_t i = 0; i < free_space_offset; i++)
     {
-        /* reached a fragment word, determine if it's the start of a fragment. */
-        if (slot_page[i] == SLOT_FRAGMENT_WORD)
+        /* reached a fragment byte, determine if it's the start of a fragment. */
+        if (raw_page[i] == SLOT_FRAGMENT_BYTE)
         {
             /* if not set, set the offset to the beginning of the fragment. */
             if(begin_fragment_offset == SLOT_INVALID_ADDR)
@@ -822,7 +895,7 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
         else
         {
             /* reached end of fragment, output it. */
-            if(i - begin_fragment_offset > 1)
+            if((i - begin_fragment_offset) > 1)
             {
                 cout << "Fragment [start: " << begin_fragment_offset << "]: length=" << (i - begin_fragment_offset) << endl;
 
@@ -830,6 +903,7 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
                 begin_fragment_offset = SLOT_INVALID_ADDR;
             }
 
+            /* start of data record/tuple redirection. */
             record_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
             cout << "Record [slot: " << record_slot << " start: " << i << "]: length=" << REC_LENGTH(raw_page + i) << endl;
 
@@ -843,8 +917,6 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
 
 // functions undefined {{{
 RC RM::deleteTuples(const string tableName) { return -1; };
-
-RC RM::deleteTuple(const string tableName, const RID &rid) { return -1; }
 
 // Assume the rid does not change after update
 RC RM::updateTuple(const string tableName, const void *data, const RID &rid) { return -1; }
