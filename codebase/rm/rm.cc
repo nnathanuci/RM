@@ -1065,14 +1065,12 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     if(handle.ReadPage(rid.pageNum, raw_page))
         return -1;
 
-    debug_data_page(raw_page, "before update");
-
     /* ensure slot is active. */
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
 
     /* get the beginning offset of free space. */
-    slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset;
+    free_space_offset = slot_page[SLOT_FREE_SPACE_INDEX];
 
     /* get the beginning offset from the slot associated with the record. */
     old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
@@ -1082,6 +1080,12 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     old_record_end_offset_even = old_record_offset + old_record_length;
     if(IS_ODD(old_record_end_offset_even))
         old_record_end_offset_even++;
+
+    stringstream ss;
+    ss << "before update: slot: " << rid.slotNum << " newlength: " << update_record_length << " ]";
+    debug_data_page(raw_page, ss.str().c_str());
+
+
 
     /* if the new record is shrinking, then overwrite and write back page. */
     if(update_record_length <= old_record_length)
@@ -1124,7 +1128,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         if(increasePageSpace(handle, rid.pageNum, n_deleted_space))
             return -1;
 
-debug_data_page(raw_page, "after update");
+debug_data_page(raw_page, "after update: record shrink");
         /* done. */
         return 0;
     }
@@ -1165,7 +1169,7 @@ debug_data_page(raw_page, "after update");
                 if(handle.WritePage(rid.pageNum, raw_page))
                     return -1;
 
-debug_data_page(raw_page, "after update");
+debug_data_page(raw_page, "new length > old length [grow in free space]");
                 return 0;
             }
             else
