@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sstream>
 
 
 RM* RM::_rm = 0;
@@ -617,6 +618,11 @@ uint16_t RM::activateSlot(uint16_t *slot_page, uint16_t activate_slot_id, uint16
     }
 } // }}}
 
+uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) // {{{
+{
+    return 1;
+} // }}}
+
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
     uint16_t record_length;
@@ -719,7 +725,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if(decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t)))
         return -1;
 
-    debug_data_page(raw_page);
+    debug_data_page(raw_page, "insertTuple");
 
     return 0;
 } // }}}
@@ -767,6 +773,12 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     uint8_t raw_page[PF_PAGE_SIZE];
     uint16_t *slot_page = (uint16_t *) raw_page;
 
+    /* num slots deleted for after deactivating a slot. */
+    uint16_t n_slots_deleted = 0;
+ 
+    /* amount of data deleted. */
+    uint16_t space_deleted;
+
     /* offset in page where the record begins. */
     uint16_t record_offset;
     uint16_t record_length;
@@ -810,17 +822,18 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
 
     cout << "GOING TO DELETE: " << record_length << " at slot: " << rid.slotNum << " with offset: " << record_offset << " to " << record_end_offset << endl;
 
-    debug_data_page(raw_page);
+    debug_data_page(raw_page, "before delete");
 
     /* two cases: record to delete is last page that appears on record preceding free space, or earlier which leaves a fragment. */
     if(record_end_offset == free_space_offset)
     {
         cout << "record_end == free_off" << endl;
+
         /* move the free space pointer to beginning of deleted record. */
         free_space_offset = record_offset;
-        slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset;
 
-        /* record is now deleted. */
+        /* delete the record by updating the free space offset. */
+        slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset;
     }
     else
     {
@@ -828,12 +841,22 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
         memset(raw_page + record_offset, SLOT_FRAGMENT_BYTE, record_end_offset - record_offset);
     }
 
-    debug_data_page(raw_page);
+   
+    space_deleted = record_end_offset - record_offset;
+    n_slots_deleted = deactivateSlot(slot_page, rid.slotNum);
+
+    debug_data_page(raw_page, "after delete");
+
+    if(handle.WritePage(rid.pageNum, raw_page))
+        return -1;
+
+    if(increasePageSpace(handle, rid.pageNum, space_deleted + n_slots_deleted * sizeof(uint16_t)))
+        return -1;
 
     return -1;
 } // }}}
 
-void RM::debug_data_page(uint8_t *raw_page) // {{{
+void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
 {
     uint16_t begin_fragment_offset = SLOT_INVALID_ADDR; /* points to invalid address. */
     uint16_t record_slot = SLOT_INVALID_ADDR; /* points to invalid address. */
@@ -847,7 +870,7 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
     uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
     uint16_t free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
 
-    cout << "[BEGIN PAGE DUMP]" << endl;
+    cout << "[BEGIN PAGE DUMP: " << annotation << " ]" << endl;
     cout << "free space offset: " << free_space_offset << endl;
     cout << "free space avail:  " << free_space_avail << endl;
     cout << "next slot:         " << next_slot << endl;
@@ -912,7 +935,7 @@ void RM::debug_data_page(uint8_t *raw_page) // {{{
         }
     }
 
-    cout << "[END PAGE DUMP]" << endl;
+    cout << "[END PAGE DUMP: " << annotation << " ]" << endl;
 } // }}}
 
 // functions undefined {{{

@@ -92,7 +92,7 @@ using namespace std;
 #define SLOT_GET_NUM_SLOTS(start) ((start)[SLOT_NUM_SLOT_INDEX])
 #define SLOT_GET_FREE_SPACE_OFFSET(start) ((start)[SLOT_FREE_SPACE_INDEX])
 #define SLOT_GET_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))])
-#define SLOT_GET_INACTIVE_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))] - PF_PAGE_SIZE)
+#define SLOT_GET_INACTIVE_SLOT(start, i) (((start)[SLOT_GET_SLOT_INDEX((i))] == SLOT_QUEUE_END) ? SLOT_QUEUE_END :  (start)[SLOT_GET_SLOT_INDEX((i))] - PF_PAGE_SIZE)
 
 #define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS((start)) - 1))
 
@@ -275,7 +275,7 @@ private:
   uint16_t deactivateSlot(uint16_t *slot_page, uint16_t slot_id);
 
   /* dump the page information given a pointer to the data page. */
-  void debug_data_page(uint8_t *raw_page);
+  void debug_data_page(uint8_t *raw_page, const char *annotation);
 
   /* dump the page information given a the page id. */
   void debug_data_page(unsigned int page_id);
