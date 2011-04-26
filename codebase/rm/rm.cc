@@ -609,11 +609,16 @@ void RM::record_to_attr(uint8_t *record, const void *tuple, const Attribute &att
    uint8_t *tuple_ptr = (uint8_t *) tuple;
    uint8_t *record_data_ptr;
 
+   uint16_t num_fields;
+
    /* end of the field preceding the one we want to project. */
    uint16_t last_field_offset;
 
    /* end of field that we want to project. */
    uint16_t end_field_offset;
+
+   /* read in the number of fields. */
+   memcpy(&num_fields, record, sizeof(num_fields));
 
    /* determine the beginning offset of the attribute. */
    if(attr_position == 0)
@@ -622,22 +627,22 @@ void RM::record_to_attr(uint8_t *record, const void *tuple, const Attribute &att
        memcpy(&last_field_offset, record + REC_FIELD_OFFSET(attr_position - 1), sizeof(last_field_offset));
 
    /* read in the value at the field offset position at attr_position. */
-   memcpy(&end_field_offset, record + REC_FIELD_OFFSET(attr_position), sizeof(field_offset));
+   memcpy(&end_field_offset, record + REC_FIELD_OFFSET(attr_position), sizeof(end_field_offset));
 
    /* position to beginning of data. */
    record_data_ptr = record + last_field_offset;
 
-   if(attrs[i].type == TypeInt)
+   if(attr.type == TypeInt)
    {
        /* copy the int to the tuple. */
        memcpy(tuple_ptr, record_data_ptr, sizeof(int));
    }
-   else if(attrs[i].type == TypeReal)
+   else if(attr.type == TypeReal)
    {
        /* copy the float to the tuple. */
        memcpy(tuple_ptr, record_data_ptr, sizeof(float));
    }
-   else if(attrs[i].type == TypeVarChar)
+   else if(attr.type == TypeVarChar)
    {
        int length = end_field_offset - last_field_offset;
 
@@ -1529,7 +1534,7 @@ RC RM::readAttribute(const string tableName, const RID &rid, const string attrib
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
 
     /* copy record to tuple buffer. */
-    record_to_data_attr(raw_page + record_offset, data, attr, attr_position);
+    record_to_attr(raw_page + record_offset, data, attr, attr_position);
 
     /* we're done, wasn't that hard? */
     return 0;
