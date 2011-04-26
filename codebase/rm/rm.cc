@@ -940,6 +940,133 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     return 0;
 } // }}}
 
+// Assume the rid does not change after update
+RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // {{{
+{
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* need to track space for growth/shrink/tuple redirection. */
+    uint16_t n_used_space = 0;
+    uint16_t n_deleted_space = 0;
+    uint16_t avail_space = 0;
+
+    /* offset in page where the old record begins. */
+    uint16_t old_record_offset;
+
+    /* length of old record. */
+    uint16_t old_record_length;
+
+    /* buffer to store the record to update. */
+    uint8_t update_record[PF_PAGE_SIZE];
+
+    /* length of updated record. */
+    uint16_t update_record_length;
+
+    /* beginning offset of free space. */
+    uint16_t free_space_offset;
+
+    /* attributes to determine data packing format. */
+    vector<Attribute> attrs;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
+
+    /* unpack data and convert into record format. Assumed to be a safe operation. */
+    tuple_to_record(data, update_record, attrs);
+    update_record_length = REC_LENGTH(update_record);
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(rid.pageNum, raw_page))
+        return -1;
+
+    /* ensure slot is active. */
+    if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
+        return -1;
+
+    /* get the beginning offset of free space. */
+    slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset;
+
+    /* get the beginning offset from the slot associated with the record. */
+    old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
+    old_record_length = REC_LENGTH(raw_page + old_record_offset);
+
+    /* if the new record is shrinking, then overwrite and write back page. */
+    if(update_record_length <= old_record_length)
+    {
+        /* nearest even end byte offset of old record. */
+        uint16_t old_record_end_offset_even;
+
+        /* align the record length to an even byte, for free space purposes. */
+        uint16_t update_record_end_offset_even;
+
+        /* copy new record. */
+        memcpy(raw_page + old_record_offset, update_record, update_record_length);
+
+        update_record_end_offset_even = old_record_offset + update_record_length;
+
+        /* mark the byte as a fragment if not on an even boundary. */
+        if(IS_ODD(update_record_length))
+        {
+            /* write out a fragment byte in the unusable space. */
+            memset(raw_page + old_record_offset + update_record_length, SLOT_FRAGMENT_BYTE, 1);
+
+            /* align the end offset to nearest even byte. */
+            update_record_end_offset_even++;
+        }
+
+        /* update the increase in space. */
+        n_deleted_space = old_record_end_offset_even - update_record_end_offset_even;
+
+        /* if the record ends on the free space offset boundary, then we just move the free space pointer, otherwise write a fragment. */
+        if(old_record_end_offset_even == free_space_offset)
+        {
+            /* set it to the even aligned ending offset of the newly updated record. */
+            slot_page[SLOT_FREE_SPACE_INDEX] = update_record_end_offset_even;
+        }
+        else
+        {
+            /* write out fragment. */
+            memset(raw_page + update_record_end_offset_even, SLOT_FRAGMENT_BYTE, n_deleted_space);
+        }
+
+        /* write page back. */
+        if(handle.WritePage(rid.pageNum, raw_page))
+            return -1;
+
+        /* update control page information. */
+        if(increasePageSpace(handle, rid.pageNum, n_deleted_space))
+            return -1;
+
+        /* done. */
+        return 0;
+    }
+    else (update_record_length > old_record_length)
+    {
+        /* used to scan adjacent fragment to end of record that lives on page. */
+        uint16_t adjacent_space = 0;
+
+        /* find out how much space is available. */
+        if(getPageSpace(handle, rid.pageNum, avail_space))
+            return -1;
+
+        /* check if record can grow in place, otherwise place a tuple redirect. */
+        
+    }
+
+    /* done. */
+    return 0;
+} // }}}
+
 void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
 {
     uint16_t begin_fragment_offset = SLOT_INVALID_ADDR; /* points to invalid address. */
@@ -1024,10 +1151,6 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
 
 // functions undefined {{{
 RC RM::deleteTuples(const string tableName) { return -1; };
-
-// Assume the rid does not change after update
-RC RM::updateTuple(const string tableName, const void *data, const RID &rid) { return -1; }
-
 
 RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
 
