@@ -1210,11 +1210,8 @@ RC RM::deleteTuples(const string tableName) // {{{
         return -1;
 
     /* truncate database, gets a new file object. */
-    if(handle.Truncate())
+    if(handle.TruncateFile())
         return -1;
-
-    /* update the handle cache to reflect new file object. */
-    open_tables[tableName] = handle;
 
     /* we're done. */
     return 0;
