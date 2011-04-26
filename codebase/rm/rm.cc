@@ -389,7 +389,10 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
 
     /* add fields for quick lookup (table.fieldname) */
     for(unsigned int i = 0; i < attrs.size(); i++)
+    {
         catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
+        catalog_fields_position[tableName+"."+attrs[i].name] = i;
+    }
 
     /* create file & append a control page. */
     if(pf->CreateFile(tableName.c_str()))
@@ -409,6 +412,25 @@ RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
     return 0;
 } // }}}
 
+RC RM::getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition) // {{{
+{
+    /* table doesnt exists. */
+    if(!catalog.count(tableName))
+        return -1;
+
+    /* check to make sure the attribute name exists. */
+    if(!catalog_fields.count(tableName+"."+attributeName))
+        return -1;
+
+    if(!catalog_fields_position.count(tableName+"."+attributeName))
+        return -1;
+
+    attr = catalog_fields[tableName+"."+attributeName];
+    attrPosition = catalog_fields_position[tableName+"."+attributeName];
+
+    return 0;
+} // }}}
+
 RC RM::deleteTable(const string tableName) // {{{
 {
     vector<Attribute> attrs;
@@ -423,7 +445,10 @@ RC RM::deleteTable(const string tableName) // {{{
 
     /* delete all fields from catalog_fields. */
     for(unsigned int i = 0; i < attrs.size(); i++)
+    {
         catalog_fields.erase(tableName+"."+attrs[i].name);
+        catalog_fields_position.erase(tableName+"."+attrs[i].name);
+    }
 
     /* delete table. */
     catalog.erase(tableName);
@@ -579,6 +604,52 @@ void RM::record_to_tuple(uint8_t *record, const void *tuple, const vector<Attrib
    }
 } // }}}
 
+void RM::record_to_attr(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position) // {{{
+{
+   uint8_t *tuple_ptr = (uint8_t *) tuple;
+   uint8_t *record_data_ptr;
+
+   /* end of the field preceding the one we want to project. */
+   uint16_t last_field_offset;
+
+   /* end of field that we want to project. */
+   uint16_t end_field_offset;
+
+   /* determine the beginning offset of the attribute. */
+   if(attr_position == 0)
+       last_field_offset = REC_START_DATA_OFFSET(num_fields);
+   else
+       memcpy(&last_field_offset, record + REC_FIELD_OFFSET(attr_position - 1), sizeof(last_field_offset));
+
+   /* read in the value at the field offset position at attr_position. */
+   memcpy(&end_field_offset, record + REC_FIELD_OFFSET(attr_position), sizeof(field_offset));
+
+   /* position to beginning of data. */
+   record_data_ptr = record + last_field_offset;
+
+   if(attrs[i].type == TypeInt)
+   {
+       /* copy the int to the tuple. */
+       memcpy(tuple_ptr, record_data_ptr, sizeof(int));
+   }
+   else if(attrs[i].type == TypeReal)
+   {
+       /* copy the float to the tuple. */
+       memcpy(tuple_ptr, record_data_ptr, sizeof(float));
+   }
+   else if(attrs[i].type == TypeVarChar)
+   {
+       int length = end_field_offset - last_field_offset;
+
+       /* write length data to tuple, and advance to where data should be appended. */
+       memcpy(tuple_ptr, &length, sizeof(length));
+       tuple_ptr += sizeof(length);
+
+       /* append varchar data to tuple from last_offset to last_offset+length. */
+       memcpy(tuple_ptr, record_data_ptr, length);
+   }
+} // }}}
+
 uint16_t RM::activateSlot(uint16_t *slot_page, uint16_t activate_slot_id, uint16_t record_offset) // {{{
 {
     /* update slot queue head. */
@@ -620,8 +691,6 @@ uint16_t RM::activateSlot(uint16_t *slot_page, uint16_t activate_slot_id, uint16
 
 uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) // {{{
 {
-    uint16_t n_deleted = 0;
-
     /* deactivate the slot, and rebuild the list. */
     slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = SLOT_QUEUE_END;
 
@@ -1422,7 +1491,49 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
 // functions undefined {{{
 
 
-RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
+RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data)
+{
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* offset in page where the record begins. */
+    uint16_t record_offset;
+
+    /* attribute of field to read. */
+    Attribute attr;
+
+    /* attribute position. */
+    uint16_t attr_position;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve table attributes. */
+    if(getAttribute(tableName, attributeName, attr, attr_position))
+        return -1;
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(rid.pageNum, raw_page))
+        return -1;
+
+    /* ensure slot is active. */
+    if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
+        return -1;
+
+    /* get the beginning offset from the slot associated with the record. */
+    record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
+
+    /* copy record to tuple buffer. */
+    record_to_data_attr(raw_page + record_offset, data, attr, attr_position);
+
+    /* we're done, wasn't that hard? */
+    return 0;
+}
 
 // scan returns an iterator to allow the caller to go through the results one by one.
 RC RM::scan(const string tableName, 

@@ -193,6 +193,8 @@ public:
 
   RC getAttributes(const string tableName, vector<Attribute> &attrs);
 
+  RC getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition);
+
   //  Format of the data passed into the function is the following:
   //  1) data is a concatenation of values of the attributes
   //  2) For int and real: use 4 bytes to store the value;
@@ -277,6 +279,7 @@ private:
   /* auxillary functions for insertTuple and readTuple. */
   void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
   void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
+  void record_to_attr(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position);
 
   /* activateSlot returns the number of new slots created to activate a given slot in the directory. [max slots created is 1] */
   uint16_t activateSlot(uint16_t *slot_page, uint16_t slot_id, uint16_t record_offset);
@@ -293,6 +296,7 @@ private:
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
   map<string, Attribute> catalog_fields;
+  map<string, uint16_t> catalog_fields_position;
 
   /* once a table is open, the file should persist. */
   map<string, PF_FileHandle> open_tables;
