@@ -1057,13 +1057,6 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     }
     else if(update_record_length > old_record_length)
     {
-        /* used to scan adjacent fragment to end of record that lives on page. */
-        uint16_t adjacent_space = 0;
-
-        /* find out how much space is available. */
-        if(getPageSpace(handle, rid.pageNum, avail_space))
-            return -1;
-
         /* check if record can grow in place, otherwise place a tuple redirect. */
 
         /* if the record ends on the free space offset, then we only need to know how much available free space we have. */
@@ -1103,14 +1096,62 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
             }
             else
             {
-                /* shrink space, write tuple redirection. */
+                /* check to see if there's enough usable space, compact and insert. */
+                /* tuple redirection. */
             }
         }
-        else
+        else if (old_record_end_offset_even < free_space_offset)
 	{
-		/* determine the amount of adjacent space avaiable in the fragment. */
-		while(raw_page[old_record_end_offset_even + adjacent_space] == SLOT_FRAGMENT_BYTE)
-			adjacent_space++;
+            /* additional space needed to fit the record. */
+            uint16_t needed_space = update_record_length - old_record_length;
+
+            /* used to scan adjacent fragment beginning directly at the end of the record. */
+            uint16_t fragment_space = 0;
+
+            /* flag to mark that we're using the residue byte in the record, since it's counted as already used space. */
+            bool fragment_byte_used = false;
+            
+            /* determine the amount of adjacent space avaiable in the fragment. */
+            while(raw_page[old_record_end_offset_even + fragment_space] == SLOT_FRAGMENT_BYTE)
+            	fragment_space++;
+            
+            /* now include the residue byte. */
+            if(IS_ODD(old_record_length))
+                fragment_byte_used = true, fragment_space++;
+            
+            /* check to see if it can fit between the end of the old record and adjacent space. */
+            if(needed_space <= fragment_space)
+            {
+                /* the fragment byte is given to us for free. */
+                n_used_space = (fragment_byte_used) ? needed_space - 1 : needed_space;
+            
+                /* overwrite record and write into free space. */
+                memcpy(raw_page + old_record_offset, update_record, update_record_length);
+            
+                update_record_end_offset_even = old_record_offset + update_record_length;
+            
+                /* mark the byte as a fragment if not on an even boundary. */
+                if(IS_ODD(update_record_length))
+                {
+                    /* write out a fragment byte in the unusable space. */
+                    memset(raw_page + old_record_offset + update_record_length, SLOT_FRAGMENT_BYTE, 1);
+            
+                    /* align the end offset to nearest even byte. */
+                    update_record_end_offset_even++;
+                }
+            
+                decreasePageSpace(handle, rid.pageNum, n_used_space);
+            
+                /* write back page. */
+                if(handle.WritePage(rid.pageNum, raw_page))
+                    return -1;
+            
+                return 0;
+            }
+            else
+            {
+                /* need to tuple redirect. */
+            }
 	}
     }
 
@@ -1170,7 +1211,7 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
     
     for(uint16_t i = 0; i < free_space_offset; i++)
     {
-        /* reached a fragment byte, determine if it's the start of a fragment. */
+        /* reached a fragment byte, determine if it's the start of a fragment. Using raw format so that we can count bytes. */
         if (raw_page[i] == SLOT_FRAGMENT_BYTE)
         {
             /* if not set, set the offset to the beginning of the fragment. */
@@ -1188,12 +1229,25 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
                 begin_fragment_offset = SLOT_INVALID_ADDR;
             }
 
-            /* start of data record/tuple redirection. */
-            record_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
-            cout << "Record [slot: " << record_slot << " start: " << i << "]: length=" << REC_LENGTH(raw_page + i) << endl;
+            if(REC_IS_TUPLE_REDIR(raw_page + i))
+            {
+                uint16_t slot_num = *((uint16_t *) (raw_page + i)) - REC_TUPLE_MARKER;
+                unsigned int page_num = *((unsigned int *) (raw_page + i + sizeof(uint16_t)));
 
-            /* skip to end of record aligned on even byte, minus one for the post increment. */
-            i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
+                cout << "Tuple Redirect [page: " << page_num << " slot: " << slot_num << "]" << endl;
+
+                /* skip the redirect length. */
+                i += (REC_TUPLE_REDIR_LENGTH - 1);
+            }
+            else if(REC_IS_RECORD(raw_page + i))
+            {
+                /* start of data record/tuple redirection. */
+                record_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
+                cout << "Record [slot: " << record_slot << " start: " << i << "]: length=" << REC_LENGTH(raw_page + i) << endl;
+
+                /* skip to end of record aligned on even byte, minus one for the post increment. */
+                i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
+            }
         }
     }
 
@@ -1216,6 +1270,12 @@ RC RM::deleteTuples(const string tableName) // {{{
     /* we're done. */
     return 0;
 } // }}}
+
+RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
+{
+    
+    return -1;
+}
 
 // functions undefined {{{
 

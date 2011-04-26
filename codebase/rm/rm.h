@@ -33,6 +33,14 @@ using namespace std;
 
 #define REC_LENGTH(start) (*((uint16_t *) ((uint8_t *) (start) + (REC_FIELD_OFFSET((*((uint16_t *) (start)))-1)))))
 
+#define REC_TUPLE_MARKER (PF_PAGE_SIZE)
+
+#define REC_TUPLE_REDIR_LENGTH (sizeof(uint16_t) + sizeof(unsigned int))
+
+/* if considered a stream of data that could be either a record or tuple redirect, use the first field to identify the type. */
+#define REC_IS_TUPLE_REDIR(start) (((*((uint16_t *) (start))) > REC_TUPLE_MARKER) && ((*((uint16_t *) (start))) < 0xFFFF))
+#define REC_IS_RECORD(start) ((*((uint16_t *) (start))) < PF_PAGE_SIZE)
+
 /* determines number of page offsets stored in a control page. */
 #define CTRL_MAX_PAGES ((int) ((PF_PAGE_SIZE)/sizeof(uint16_t)))
 
@@ -96,7 +104,9 @@ using namespace std;
 
 #define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS((start)) - 1))
 
-/* calculate free space by subtracting the beginning of the last slot with the free space offset. */
+/* calculate free space by subtracting the beginning of the last slot with the free space offset.
+   (multiply by 2 since the slot index is for an array of uint16_t instead of uint8_t).
+*/
 #define SLOT_GET_FREE_SPACE(start) ((sizeof(uint16_t)*SLOT_GET_LAST_SLOT_INDEX(start)) - SLOT_GET_FREE_SPACE_OFFSET(start))
 
 /* SLOT_MAX_SPACE is essentially the beginning of the slot directory in an
