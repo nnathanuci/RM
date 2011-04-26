@@ -622,81 +622,80 @@ uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) //
 {
     uint16_t n_deleted = 0;
 
-    /* determine if it's the last slot, we may need to recreate the slot queue. */
-    if(deactivate_slot_id == SLOT_GET_LAST_SLOT_INDEX(slot_page))
+    /* deactivate the slot, and rebuild the list. */
+    slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = SLOT_QUEUE_END;
+
+    /* original number of slots before deletion. */
+    uint16_t orig_num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    /* new number of slots. */
+    uint16_t new_num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    /* auxillary variable to find the last active slot in the directory by walking backwards. */
+    uint16_t last_active_slot = SLOT_GET_NUM_SLOTS(slot_page) - 1;
+
+    /* auxillary variable to help determine the count of slots. */
+    uint16_t final_slot_index;
+
+
+    /* if there's only one slot, then slot id 0 is being deleted, don't worry about this case. */
+    if(orig_num_slots == 1)
     {
-        /* auxillary variable to help determine the count of slots. */
-        uint16_t final_slot_index;
+        slot_page[SLOT_NEXT_SLOT_INDEX] = 0;
+        slot_page[SLOT_GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
+ 
+        /* no slots deleted. */
+        return 0;
+    }
 
-        /* if there's only one slot, then slot id 0 is being deleted, don't worry about this case. */
-        if(SLOT_GET_NUM_SLOTS(slot_page) == 1)
+    /* find the last active slot starting from the end of the directory. */
+    while(last_active_slot && SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
+        last_active_slot--;
+
+    /* ensure the last active slot is actually active (we could've hit the first slot and terminated the loop early). */
+    if(SLOT_IS_ACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
+        final_slot_index = last_active_slot + 1;
+    else
+        final_slot_index = last_active_slot;
+
+    /* set the slot count, appending a free slot. */
+    new_num_slots = final_slot_index + 1;
+    slot_page[SLOT_NUM_SLOT_INDEX] = final_slot_index + 1;
+
+    /* check to see if there's any available inactive slots. */
+    for(uint16_t i = 0; i < last_active_slot; i++)
+    {
+        if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, i)))
         {
-            slot_page[SLOT_NEXT_SLOT_INDEX] = 0;
-            slot_page[SLOT_GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
-
-            /* no slots deleted. */
-            return 0;
-        }
-
-        /* more than one slot excluding the one being deleted. */
-
-        /* delete the last slot. */
-        slot_page[SLOT_NUM_SLOT_INDEX]--;
-        n_deleted++;
-
-        /* find the last active slot if any. */
-
-        uint16_t last_active_slot = SLOT_GET_LAST_SLOT_INDEX(slot_page);
-
-        while(last_active_slot && SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
-	    n_deleted++, last_active_slot--;
-
-        /* ensure the last active slot is actually active (we could've hit the first slot and terminated the loop early). */
-        if(SLOT_IS_ACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
-            n_deleted++, final_slot_index = last_active_slot + 1;
-        else
-            final_slot_index = last_active_slot;
-
-        /* set the slot count. */
-        slot_page[SLOT_NUM_SLOT_INDEX] = final_slot_index + 1;
-
-        /* rebuild linked list of inactive slots. */
-
-        /* set the next slot to end of queue. */
-        slot_page[SLOT_NEXT_SLOT_INDEX] = SLOT_QUEUE_END;
-
-        for(uint16_t i = 0; i < SLOT_GET_NUM_SLOTS(slot_page); i++)
-        {
-            /* only consider inactive slots. */
-            if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, i)))
-            {
-                if(slot_page[SLOT_NEXT_SLOT_INDEX] == SLOT_QUEUE_END)
-                    slot_page[SLOT_GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
-                else
-                    slot_page[SLOT_GET_SLOT_INDEX(i)] = PF_PAGE_SIZE + slot_page[SLOT_NEXT_SLOT_INDEX];
-
-                /* point to new slot. */
-                slot_page[SLOT_NEXT_SLOT_INDEX] = i;
-            }
+            /* found an empty slot, we have all we need. */
+            new_num_slots--;
+            slot_page[SLOT_NUM_SLOT_INDEX]--;
+            break;
         }
     }
-    else
+    
+    /* rebuild linked list of inactive slots. */
+
+    /* set the next slot to end of queue. */
+    slot_page[SLOT_NEXT_SLOT_INDEX] = SLOT_QUEUE_END;
+
+    for(uint16_t i = 0; i < new_num_slots; i++)
     {
-        /* deactivate slot, make it head of queue. */
-        if(slot_page[SLOT_NEXT_SLOT_INDEX] == SLOT_QUEUE_END)
-            slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = SLOT_QUEUE_END;
-        else
-            slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = PF_PAGE_SIZE + slot_page[SLOT_NEXT_SLOT_INDEX];
+        /* only consider inactive slots. */
+        if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, i)))
+        {
+            if(slot_page[SLOT_NEXT_SLOT_INDEX] == SLOT_QUEUE_END)
+                slot_page[SLOT_GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
+            else
+                slot_page[SLOT_GET_SLOT_INDEX(i)] = PF_PAGE_SIZE + slot_page[SLOT_NEXT_SLOT_INDEX];
 
-        /* point to the new slot. */
-        slot_page[SLOT_NEXT_SLOT_INDEX] = deactivate_slot_id;
-
-        /* no slots deleted. */
-        n_deleted = 0;
+            /* point to new slot. */
+            slot_page[SLOT_NEXT_SLOT_INDEX] = i;
+        }
     }
 
     /* slot directory updated. */
-    return n_deleted;
+    return (orig_num_slots - new_num_slots);
 } // }}}
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
@@ -911,8 +910,6 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     /* two cases: record to delete is last page that appears on record preceding free space, or earlier which leaves a fragment. */
     if(record_end_offset == free_space_offset)
     {
-        cout << "record_end == free_off" << endl;
-
         /* move the free space pointer to beginning of deleted record. */
         free_space_offset = record_offset;
 
@@ -1360,14 +1357,14 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
                     /* update hash with the slot for the new offset. */
                     offset_to_slot_map[SLOT_HASH_FUNC(begin_fragment_offset)] = redir_slot;
 
-                    /* update beginning offset */
+                    /* update beginning fragment offset (skip the redirection data)  */
                     begin_fragment_offset += length;
 
                     /* mark residue data to continue identifying fragments, etc. */
                     if(fragment_size >= length)
                     {
                         mark_length = fragment_size - length;
-                        memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
+                        memset(raw_page + i, SLOT_FRAGMENT_BYTE, mark_length);
                     }
                     else if(fragment_size < length)
                     {
