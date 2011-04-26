@@ -711,7 +711,6 @@ uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) //
     /* auxillary variable to help determine the count of slots. */
     uint16_t final_slot_index;
 
-
     /* if there's only one slot, then slot id 0 is being deleted, don't worry about this case. */
     if(orig_num_slots == 1)
     {
@@ -1066,6 +1065,8 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     if(handle.ReadPage(rid.pageNum, raw_page))
         return -1;
 
+    debug_data_page(raw_page, "before update");
+
     /* ensure slot is active. */
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
@@ -1123,6 +1124,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         if(increasePageSpace(handle, rid.pageNum, n_deleted_space))
             return -1;
 
+debug_data_page(raw_page, "after update");
         /* done. */
         return 0;
     }
@@ -1163,6 +1165,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 if(handle.WritePage(rid.pageNum, raw_page))
                     return -1;
 
+debug_data_page(raw_page, "after update");
                 return 0;
             }
             else
@@ -1217,6 +1220,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 if(handle.WritePage(rid.pageNum, raw_page))
                     return -1;
             
+debug_data_page(raw_page, "after update");
                 return 0;
             }
             else
@@ -1226,6 +1230,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 	}
     }
 
+debug_data_page(raw_page, "after update");
     /* done. */
     return 0;
 } // }}}
