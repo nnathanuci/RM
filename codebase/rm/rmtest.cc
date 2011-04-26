@@ -995,21 +995,117 @@ void rmTest_PageMgmt(RM *rm) // {{{
 
 void rmTest_TableMgmt(RM *rm) // {{{
 {
-    //RID r1;
+    RID r1, r2;
 
-    //string t1 = "t1";
-    //vector<Attribute> t1_attrs;
-    //t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+    /* used when getting free pages. */
+    unsigned int page_id, n_pages;
+    uint16_t unused_space, aux_space;
+    uint16_t request;
 
-    /*
-        //  Format of the data passed into the function is the following:
-        //  1) data is a concatenation of values of the attributes
-        //  2) For int and real: use 4 bytes to store the value;
-        //     For varchar: use 4 bytes to store the length of characters, then store the actual characters.
-        //  !!!The same format is used for updateTuple(), the returned data of readTuple(), and readAttribute()
+    /* create a scratch control page for comparison purposes only */
+    uint16_t scratch_ctrl_page[CTRL_MAX_PAGES];
 
-        RC insertTuple(const string tableName, const void *data, RID &rid);
-    */
+    /* buffer to read in page. */
+    char read_page_buf[PF_PAGE_SIZE];
+
+    /* void pointer for passing to functions. */
+    void *read_page = read_page_buf;
+
+    /* place to store data. */
+    int data_size;
+    char data[PF_PAGE_SIZE];
+    char data_read[PF_PAGE_SIZE];
+
+
+    /* clear the data/data_read to ensure the data matches. */
+    memset(data, 0xF8, PF_PAGE_SIZE);
+    memset(data_read, 0xF8, PF_PAGE_SIZE);
+
+    PF_FileHandle handle;
+
+    string t1 = "t1";
+    vector<Attribute> t1_attrs;
+    /* 512 byte max records. */
+    t1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 508 });
+
+    
+    cout << "\n[ insert and read a record. ]" << endl; // {{{
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    
+    /* create a record. */
+    data_size = 1;
+    memcpy(data, &data_size, sizeof(data_size));
+    memcpy(data+sizeof(data_size), &("T"), 1);
+    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+    cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
+   
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "rm->readTuple(" << t1 << ", r1)" << endl;
+
+    /* wipe out the table. */
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+    // }}} 
+
+    cout << "\n[ insert 2 records and delete the last record. ]" << endl; // {{{
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    
+    /* create a record. */
+    data_size = 1;
+    memcpy(data, &data_size, sizeof(data_size));
+    memcpy(data+sizeof(data_size), &("T"), 1);
+    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+    cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
+   
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "rm->readTuple(" << t1 << ", r1)" << endl;
+
+    /* create second record. */
+    data_size = 1;
+    memcpy(data, &data_size, sizeof(data_size));
+    memcpy(data+sizeof(data_size), &("T"), 1);
+    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+    cout << "rm->insertTuple(" << t1 << ", r2)" << endl;
+   
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "rm->readTuple(" << t1 << ", r2)" << endl;
+
+    /* delete last record. */
+    ZERO_ASSERT(rm->deleteTuple(t1, r2));
+
+    /* wipe out the table. */
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+    // }}} 
+
+    cout << "\n[ insert 2 records and delete the first record. ]" << endl; // {{{
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    
+    /* create a record. */
+    data_size = 1;
+    memcpy(data, &data_size, sizeof(data_size));
+    memcpy(data+sizeof(data_size), &("T"), 1);
+    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+    cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
+   
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "rm->readTuple(" << t1 << ", r1)" << endl;
+
+    /* wipe out the table. */
+    ZERO_ASSERT(rm->deleteTable(t1));
+    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+    // }}} 
 
 } // }}}
 
@@ -1022,9 +1118,9 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    rmTest_SystemCatalog(rm);
-    rmTest_PageMgmt(rm);
-    //rmTest_TableMgmt(rm);
+    //rmTest_SystemCatalog(rm);
+    //rmTest_PageMgmt(rm);
+    rmTest_TableMgmt(rm);
 }
 
 int main(int argc, char **argv)
