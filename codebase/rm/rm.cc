@@ -1174,8 +1174,11 @@ debug_data_page(raw_page, "new length > old length [grow in free space]");
             }
             else
             {
-                /* check to see if there's enough usable space, compact and insert. */
-                /* tuple redirection. */
+                /* check if there's enough available space. */
+                /* mark record. */
+                /* compact. */
+                /* append to free space. */
+                /* insert redirect. */
             }
         }
         else if (old_record_end_offset_even < free_space_offset)
