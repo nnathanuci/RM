@@ -1221,7 +1221,7 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
         else
         {
             /* reached end of fragment, output it. */
-            if((i - begin_fragment_offset) > 1)
+            if(((int32_t) i - (int32_t) begin_fragment_offset) > 1)
                 cout << "Fragment [start: " << begin_fragment_offset << "]: length=" << (i - begin_fragment_offset) << endl;
 
             if(REC_IS_TUPLE_REDIR(raw_page + i))
@@ -1334,35 +1334,77 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
         else
         {
             /* reached end of fragment, output it. */
-            if((i - begin_fragment_offset) > 1)
+            if(((int32_t) i - (int32_t) begin_fragment_offset) > 1)
             {
+                uint16_t fragment_size = (i - begin_fragment_offset);
+
                 /* determine if followed by record or tuple redirect. */
                 if(REC_IS_TUPLE_REDIR(raw_page + i))
                 {
-                    uint16_t fragment_size = (i - begin_fragment_offset);
                     uint16_t length = REC_TUPLE_REDIR_LENGTH;
                     uint16_t mark_length;
+                    uint16_t redir_slot;
 
                     /* move the data. */
                     memcpy(raw_page + begin_fragment_offset, raw_page + i, length);
 
-                    // mark residue data to continue identifying fragments, etc.
+                    /* update slot information with fragment offset as that's where the data is now copied. */
+                    redir_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
+
+                    /* invalidate old offset in hash. */
+                    offset_to_slot_map[SLOT_HASH_FUNC(i)] = SLOT_FRAGMENT_WORD;
+
+                    /* update slot table with the new offset. */
+                    slot_page[SLOT_GET_SLOT_INDEX(redir_slot)] = begin_fragment_offset;
+
+                    /* update hash with the slot for the new offset. */
+                    offset_to_slot_map[SLOT_HASH_FUNC(begin_fragment_offset)] = redir_slot;
+
+                    /* update beginning offset */
+                    begin_fragment_offset += length;
+
+                    /* mark residue data to continue identifying fragments, etc. */
                     if(fragment_size >= length)
                     {
                         mark_length = fragment_size - length;
-                        memset(raw_page + begin_fragment_offset + length, SLOT_FRAGMENT_BYTE, mark_length);
+                        memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
                     }
-                    else
-                        memset(raw_page + begin_fragment_offset + length, SLOT_FRAGMENT_BYTE, (i - (begin_fragment_offset + length)));
+                    else if(fragment_size < length)
+                    {
+                        mark_length = (i + length) - begin_fragment_offset;
+                        memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
+                    }
                 }
+                else if(REC_IS_RECORD(raw_page + i))
+                {
+                    uint16_t length = REC_LENGTH(raw_page + i);
+                    uint16_t mark_length;
 
-                /* reset the fragment pointer. */
-                begin_fragment_offset = SLOT_INVALID_ADDR;
+                    /* align data. */
+                    if(IS_ODD(length))
+                        length++;
+
+                    /* move the data. */
+                    memcpy(raw_page + begin_fragment_offset, raw_page + i, length);
+
+                    /* update beginning offset */
+                    begin_fragment_offset += length;
+
+                    if(fragment_size >= length)
+                    {
+                        mark_length = fragment_size - length;
+                        memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
+                    }
+
+                }
             }
             else if(REC_IS_TUPLE_REDIR(raw_page + i))
             {
                 /* skip the redirect (compensate for post-increment). */
                 i += (REC_TUPLE_REDIR_LENGTH - 1);
+
+                /* reset the fragment pointer. */
+                begin_fragment_offset = SLOT_INVALID_ADDR;
             }
             else if(REC_IS_RECORD(raw_page + i))
             {
@@ -1370,6 +1412,9 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
 
                 /* skip to end of record aligned on even byte, minus one for the post increment. */
                 i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
+
+                /* reset the fragment pointer. */
+                begin_fragment_offset = SLOT_INVALID_ADDR;
             }
         }
     }
