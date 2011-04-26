@@ -107,6 +107,21 @@ RC PF_FileHandle::CloseFile()
     return -1;
 }
 
+RC PF_FileHandle::TruncateFile()
+{
+    FILE *new_handle = NULL;
+
+    /* no handle open, therefore cannot truncate. */
+    if(!handle)
+        return -1;
+
+    /* reopen the stream, use mode to truncate, will always return the same object, otherwise you couldn't freopen(stdin), etc. */
+    if(!(freopen(NULL, "wb+", handle)))
+        return -1;
+
+    /* error */
+    return -1;
+}
 
 RC PF_FileHandle::ReadPage(PageNum pageNum, void *data)
 {
