@@ -620,7 +620,83 @@ uint16_t RM::activateSlot(uint16_t *slot_page, uint16_t activate_slot_id, uint16
 
 uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) // {{{
 {
-    return 1;
+    uint16_t n_deleted = 0;
+
+    /* determine if it's the last slot, we may need to recreate the slot queue. */
+    if(deactivate_slot_id == SLOT_GET_LAST_SLOT_INDEX(slot_page))
+    {
+        /* auxillary variable to help determine the count of slots. */
+        uint16_t final_slot_index;
+
+        /* if there's only one slot, then slot id 0 is being deleted, don't worry about this case. */
+        if(SLOT_GET_NUM_SLOTS(slot_page) == 1)
+        {
+            slot_page[SLOT_NEXT_SLOT_INDEX] = 0;
+            slot_page[SLOT_GET_SLOT_INDEX(0)] = SLOT_QUEUE_END;
+
+            /* no slots deleted. */
+            return 0;
+        }
+
+        /* more than one slot excluding the one being deleted. */
+
+        /* delete the last slot. */
+        slot_page[SLOT_NUM_SLOT_INDEX]--;
+        n_deleted++;
+
+        /* find the last active slot if any. */
+
+        uint16_t last_active_slot = SLOT_GET_LAST_SLOT_INDEX(slot_page);
+
+        while(last_active_slot && SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
+	    n_deleted++, last_active_slot--;
+
+        /* ensure the last active slot is actually active (we could've hit the first slot and terminated the loop early). */
+        if(SLOT_IS_ACTIVE(SLOT_GET_SLOT(slot_page, last_active_slot)))
+            n_deleted++, final_slot_index = last_active_slot + 1;
+        else
+            final_slot_index = last_active_slot;
+
+        /* set the slot count. */
+        slot_page[SLOT_NUM_SLOT_INDEX] = final_slot_index + 1;
+
+        /* rebuild linked list of inactive slots. */
+
+        /* set the next slot to end of queue. */
+        slot_page[SLOT_NEXT_SLOT_INDEX] = SLOT_QUEUE_END;
+
+        for(uint16_t i = 0; i < SLOT_GET_NUM_SLOTS(slot_page); i++)
+        {
+            /* only consider inactive slots. */
+            if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, i)))
+            {
+                if(slot_page[SLOT_NEXT_SLOT_INDEX] == SLOT_QUEUE_END)
+                    slot_page[SLOT_GET_SLOT_INDEX(i)] = SLOT_QUEUE_END;
+                else
+                    slot_page[SLOT_GET_SLOT_INDEX(i)] = PF_PAGE_SIZE + slot_page[SLOT_NEXT_SLOT_INDEX];
+
+                /* point to new slot. */
+                slot_page[SLOT_NEXT_SLOT_INDEX] = i;
+            }
+        }
+    }
+    else
+    {
+        /* deactivate slot, make it head of queue. */
+        if(slot_page[SLOT_NEXT_SLOT_INDEX] == SLOT_QUEUE_END)
+            slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = SLOT_QUEUE_END;
+        else
+            slot_page[SLOT_GET_SLOT_INDEX(deactivate_slot_id)] = PF_PAGE_SIZE + slot_page[SLOT_NEXT_SLOT_INDEX];
+
+        /* point to the new slot. */
+        slot_page[SLOT_NEXT_SLOT_INDEX] = deactivate_slot_id;
+
+        /* no slots deleted. */
+        n_deleted = 0;
+    }
+
+    /* slot directory updated. */
+    return n_deleted;
 } // }}}
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
@@ -757,6 +833,10 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
     if(handle.ReadPage(rid.pageNum, raw_page))
         return -1;
 
+    /* ensure slot is active. */
+    if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
+        return -1;
+
     /* get the beginning offset from the slot associated with the record. */
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
 
@@ -810,6 +890,10 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     /* get the beginning offset of free space. */
     free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
 
+    /* ensure slot is active, otherwise pointless to delete. */
+    if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
+        return -1;
+
     /* get the beginning offset from the slot associated with the record. */
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
     record_length = REC_LENGTH(raw_page + record_offset);
@@ -853,7 +937,7 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     if(increasePageSpace(handle, rid.pageNum, space_deleted + n_slots_deleted * sizeof(uint16_t)))
         return -1;
 
-    return -1;
+    return 0;
 } // }}}
 
 void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
