@@ -955,6 +955,9 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     /* offset in page where the old record begins. */
     uint16_t old_record_offset;
 
+    /* nearest even end byte offset of old record. */
+    uint16_t old_record_end_offset_even;
+
     /* length of old record. */
     uint16_t old_record_length;
 
@@ -963,6 +966,9 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 
     /* length of updated record. */
     uint16_t update_record_length;
+
+    /* align the record length to an even byte, for free space purposes. */
+    uint16_t update_record_end_offset_even;
 
     /* beginning offset of free space. */
     uint16_t free_space_offset;
@@ -1000,15 +1006,14 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
     old_record_length = REC_LENGTH(raw_page + old_record_offset);
 
+    /* find even aligned ending offset for the old record. */
+    old_record_end_offset_even = old_record_offset + old_record_length;
+    if(IS_ODD(old_record_end_offset_even))
+        old_record_end_offset_even++;
+
     /* if the new record is shrinking, then overwrite and write back page. */
     if(update_record_length <= old_record_length)
     {
-        /* nearest even end byte offset of old record. */
-        uint16_t old_record_end_offset_even;
-
-        /* align the record length to an even byte, for free space purposes. */
-        uint16_t update_record_end_offset_even;
-
         /* copy new record. */
         memcpy(raw_page + old_record_offset, update_record, update_record_length);
 
@@ -1050,7 +1055,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         /* done. */
         return 0;
     }
-    else (update_record_length > old_record_length)
+    else if(update_record_length > old_record_length)
     {
         /* used to scan adjacent fragment to end of record that lives on page. */
         uint16_t adjacent_space = 0;
@@ -1060,7 +1065,53 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
             return -1;
 
         /* check if record can grow in place, otherwise place a tuple redirect. */
+
+        /* if the record ends on the free space offset, then we only need to know how much available free space we have. */
+        if(old_record_end_offset_even == free_space_offset)
+        {
+            /* if it fits in free space, then we're good. */
+            if(update_record_length <= (old_record_length + SLOT_GET_FREE_SPACE(slot_page)))
+            {
+                /* overwrite record. */
+                memcpy(raw_page + old_record_offset, update_record, update_record_length);
+
+                update_record_end_offset_even = old_record_offset + update_record_length;
+
+                /* mark the byte as a fragment if not on an even boundary. */
+                if(IS_ODD(update_record_length))
+                {
+                    /* write out a fragment byte in the unusable space. */
+                    memset(raw_page + old_record_offset + update_record_length, SLOT_FRAGMENT_BYTE, 1);
         
+                    /* align the end offset to nearest even byte. */
+                    update_record_end_offset_even++;
+                }
+
+                /* update used space and move the free space to the end of the record. */
+                n_used_space = update_record_end_offset_even - old_record_end_offset_even;
+
+                /* update free space offset to end of the newly updated record. */
+                slot_page[SLOT_FREE_SPACE_INDEX] = update_record_end_offset_even;
+
+                decreasePageSpace(handle, rid.pageNum, n_used_space);
+
+                /* write back page. */
+                if(handle.WritePage(rid.pageNum, raw_page))
+                    return -1;
+
+                return 0;
+            }
+            else
+            {
+                /* shrink space, write tuple redirection. */
+            }
+        }
+        else
+	{
+		/* determine the amount of adjacent space avaiable in the fragment. */
+		while(raw_page[old_record_end_offset_even + adjacent_space] == SLOT_FRAGMENT_BYTE)
+			adjacent_space++;
+	}
     }
 
     /* done. */
@@ -1149,8 +1200,28 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
     cout << "[END PAGE DUMP: " << annotation << " ]" << endl;
 } // }}}
 
+RC RM::deleteTuples(const string tableName) // {{{
+{
+    /* Handle for database. */
+    PF_FileHandle handle;
+
+    /* open table, get handle. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* truncate database, gets a new file object. */
+    if(handle.Truncate())
+        return -1;
+
+    /* update the handle cache to reflect new file object. */
+    open_tables[tableName] = handle;
+
+    /* we're done. */
+    return 0;
+} // }}}
+
 // functions undefined {{{
-RC RM::deleteTuples(const string tableName) { return -1; };
+
 
 RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
 
