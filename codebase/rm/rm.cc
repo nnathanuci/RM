@@ -1222,12 +1222,7 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
         {
             /* reached end of fragment, output it. */
             if((i - begin_fragment_offset) > 1)
-            {
                 cout << "Fragment [start: " << begin_fragment_offset << "]: length=" << (i - begin_fragment_offset) << endl;
-
-                /* reset the fragment pointer. */
-                begin_fragment_offset = SLOT_INVALID_ADDR;
-            }
 
             if(REC_IS_TUPLE_REDIR(raw_page + i))
             {
@@ -1248,6 +1243,9 @@ void RM::debug_data_page(uint8_t *raw_page, const char *annotation) // {{{
                 /* skip to end of record aligned on even byte, minus one for the post increment. */
                 i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
             }
+
+            /* reset the fragment pointer. */
+            begin_fragment_offset = SLOT_INVALID_ADDR;
         }
     }
 
@@ -1273,7 +1271,109 @@ RC RM::deleteTuples(const string tableName) // {{{
 
 RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
 {
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* attributes to determine data packing format. */
+    vector<Attribute> attrs;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    uint16_t begin_fragment_offset = SLOT_INVALID_ADDR; /* points to invalid address. */
+    uint16_t offset_to_slot_map[SLOT_HASH_SIZE];
+    uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+
+    /* retrieve table attributes. */
+    if(getAttributes(tableName, attrs))
+        return -1;
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(pageNumber, raw_page))
+        return -1;
+
+
+    /* read in the slot directory, create a map. */
+
+    /* invalidate offset map. */ 
+    memset(offset_to_slot_map, 0xFF, PF_PAGE_SIZE);
+
+    /* build the offset to slot hash table. */
+    for(uint16_t i = 0; i < SLOT_GET_NUM_SLOTS(slot_page); i++)
+    {
+        /* slot_index points to the data position in the slot directory relative to the page. */
+        uint16_t slot_index = SLOT_GET_SLOT_INDEX(i);
+
+        /* slot_directory[i] offset. */
+        uint16_t offset = slot_page[slot_index];
+
+        if(SLOT_IS_ACTIVE(offset))
+            offset_to_slot_map[SLOT_HASH_FUNC(offset)] = i;
+    }
+
+    /* scan through finding all fragments and records until free space is reached.
+       reading the slot page as 2 byte chunks, so it's expected that free_space_offset is aligned on even boundary.
+    */
+
+    assert(IS_EVEN(free_space_offset));
     
+    for(uint16_t i = 0; i < free_space_offset; i++)
+    {
+        /* reached a fragment byte, determine if it's the start of a fragment. Using raw format so that we can count bytes. */
+        if (raw_page[i] == SLOT_FRAGMENT_BYTE)
+        {
+            /* if not set, set the offset to the beginning of the fragment. */
+            if(begin_fragment_offset == SLOT_INVALID_ADDR)
+                begin_fragment_offset = i;
+        }
+        else
+        {
+            /* reached end of fragment, output it. */
+            if((i - begin_fragment_offset) > 1)
+            {
+                /* determine if followed by record or tuple redirect. */
+                if(REC_IS_TUPLE_REDIR(raw_page + i))
+                {
+                    uint16_t fragment_size = (i - begin_fragment_offset);
+                    uint16_t length = REC_TUPLE_REDIR_LENGTH;
+                    uint16_t mark_length;
+
+                    /* move the data. */
+                    memcpy(raw_page + begin_fragment_offset, raw_page + i, length);
+
+                    // mark residue data to continue identifying fragments, etc.
+                    if(fragment_size >= length)
+                    {
+                        mark_length = fragment_size - length;
+                        memset(raw_page + begin_fragment_offset + length, SLOT_FRAGMENT_BYTE, mark_length);
+                    }
+                    else
+                        memset(raw_page + begin_fragment_offset + length, SLOT_FRAGMENT_BYTE, (i - (begin_fragment_offset + length)));
+                }
+
+                /* reset the fragment pointer. */
+                begin_fragment_offset = SLOT_INVALID_ADDR;
+            }
+            else if(REC_IS_TUPLE_REDIR(raw_page + i))
+            {
+                /* skip the redirect (compensate for post-increment). */
+                i += (REC_TUPLE_REDIR_LENGTH - 1);
+            }
+            else if(REC_IS_RECORD(raw_page + i))
+            {
+                /* skip over record. */
+
+                /* skip to end of record aligned on even byte, minus one for the post increment. */
+                i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
+            }
+        }
+    }
+
     return -1;
 }
 
@@ -1281,8 +1381,6 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
 
 
 RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) { return -1; }
-
-RC RM::reorganizePage(const string tableName, const unsigned pageNumber) { return -1; }
 
 // scan returns an iterator to allow the caller to go through the results one by one.
 RC RM::scan(const string tableName, 
