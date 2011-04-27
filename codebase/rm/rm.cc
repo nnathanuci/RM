@@ -23,16 +23,16 @@ RM::RM()
 {
     pf = PF_Manager::Instance();
 
+    /* spurious output of diagnostic messages. */
     debug = false;
-    /* find system catalog file, create an open file handle, and empty map to cache open tables. */
 
-    /* XXX: put code to open system catalog. */
+    /* open system catalogue */
 
-    /* hardcoded system catalogue attributse, pre-populated. */
+    /* hardcode system catalogue attributes and table name. */
     {
         Attribute attr;
 
-        attr.name = "tablename";
+        attr.name = "table";
         attr.type = TypeVarChar;
         attr.length = (AttrLength) MAX_CAT_NAME_LEN;
         system_catalog_attrs.push_back(attr);
@@ -64,7 +64,8 @@ RM::RM()
     {
         PF_FileHandle handle;
 
-        openTable(system_catalog_tablename, handle);
+        /* we have to assume this is guaranteed to work. */
+        assert(openTable(system_catalog_tablename, handle) == 0);
     }
 }
 
@@ -2297,10 +2298,8 @@ RC RM::readAttribute(const string tableName, const RID &rid, const string attrib
     return 0;
 } // }}}
 
-// scan returns an iterator to allow the caller to go through the results one by one. // {{{
-RC RM::scan(const string tableName, 
-      const vector<string> &attributeNames, // a list of projected attributes
-      RM_ScanIterator &rm_ScanIterator)
+// scan returns an iterator to allow the caller to go through the results one by one.
+RC RM::scan(const string tableName, const vector<string> &attributeNames, RM_ScanIterator &rm_ScanIterator) // {{{
 {
     /* number of pages: control/data */
     unsigned int n_pages;
@@ -2347,10 +2346,85 @@ RC RM::scan(const string tableName,
     rm_ScanIterator.page_id = 0;
     rm_ScanIterator.slot_id = 0;
     rm_ScanIterator.handle = handle;
+    rm_ScanIterator.op = NO_OP;
+    rm_ScanIterator.value = NULL;
 
     return 0;
 }
 // }}}
+
+/* compOP is the comparison type, value is the value to compare with, and attributeNames are the attributes. */
+RC RM::scan(const string tableName, const string conditionAttribute, const CompOp compOp, const void *value, const vector<string> &attributeNames, RM_ScanIterator &rm_ScanIterator) // {{{
+{
+    /* number of pages: control/data */
+    unsigned int n_pages;
+    unsigned int n_ctrl_pages;
+    unsigned int n_data_pages;
+
+    /* attribute for the condition. */
+    Attribute cond_attr;
+
+    /* position of condition attribute. */
+    uint16_t cond_attr_pos;
+
+    /* attribute of fields to read. */
+    vector<Attribute> attrs;
+
+    /* attribute positions. */
+    vector<uint16_t> attrs_pos;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve each attribute. */
+    for (unsigned int i = 0; i < attributeNames.size(); i++)
+    {
+        Attribute attr;
+        uint16_t attr_pos;
+
+        if (getAttribute(tableName, attributeNames[i], attr, attr_pos))
+            return -1;
+
+        attrs.push_back(attr);
+        attrs_pos.push_back(attr_pos);
+    }
+
+    /* open table to get number of pages. */
+    if (openTable(tableName, handle))
+        return -1;
+
+    /* need to know the amount of data pages to scan. */
+    n_pages = handle.GetNumberOfPages();
+    n_ctrl_pages = CTRL_NUM_CTRL_PAGES(n_pages);
+    n_data_pages = CTRL_NUM_DATA_PAGES(n_pages);
+
+    /* setup the scan iterator. */
+    rm_ScanIterator.attrs = attrs;
+    rm_ScanIterator.attrs_pos = attrs_pos;
+    rm_ScanIterator.n_pages = n_pages;
+    rm_ScanIterator.n_data_pages = n_data_pages;
+    rm_ScanIterator.n_ctrl_pages = n_ctrl_pages;
+    rm_ScanIterator.page_id = 0;
+    rm_ScanIterator.slot_id = 0;
+    rm_ScanIterator.handle = handle;
+
+    /* conditional attribute stuff. */
+    rm_ScanIterator.op = compOp;
+    rm_ScanIterator.value = value;
+
+    /* get the actual attribute. */
+    if (getAttribute(tableName, conditionalAttribute[i], cond_attr, cond_attr_pos))
+        return -1;
+
+    rm_ScanIterator.cond_attr = cond_attr;
+    rm_ScanIterator.cond_attr_pos = cond_attr_pos;
+
+    return 0;
+}
+
+// }}}
+
+
 
 RC RM::debug_data_page(const string tableName, unsigned int page_id, const char *annotation) // {{{
 {
@@ -2408,7 +2482,7 @@ void RM_ScanIterator::record_attrs_to_tuple(uint8_t *record, void *data)
     }
 }
 
-RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
+RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data)
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -2432,7 +2506,7 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
         return -1;
 
     if(slot_id == 0 && (RM::Instance())->debug)
-        RM::debug_data_page(raw_page, "scanning data page");
+        RM::debug_data_page(raw_page, "scanning data page (cond)");
 
     /* update the slot count. */
     num_slots = SLOT_GET_NUM_SLOTS(slot_page);
@@ -2484,6 +2558,86 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
     return 0;
 }
 
+RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
+{
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* record offset. */
+    uint16_t record_offset;
+
+    /* use the conditional iterator if we have a condition. */
+    if (op != NO_OP)
+        return getNextTupleCond(rid, data);
+
+    /* need at least a control and data page to iterate. */
+    if (n_pages < 2)
+       return RM_EOF;
+
+    if(page_id == 0)
+        page_id = 1;
+
+    if(page_id >= n_pages)
+        return RM_EOF;
+      
+    /* bring in the page. */ 
+    if (handle.ReadPage(page_id, raw_page))
+        return -1;
+
+    if(slot_id == 0 && (RM::Instance())->debug)
+        RM::debug_data_page(raw_page, "scanning data page");
+
+    /* update the slot count. */
+    num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    /* find first active slot, get the record offset. */
+    while(slot_id < num_slots)
+    {
+        record_offset = SLOT_GET_SLOT(slot_page, slot_id);
+
+        /* if all crtieria are met, then we can use this slot id to get a record. */
+        if(slot_id < num_slots && SLOT_IS_ACTIVE(record_offset) && REC_IS_RECORD(raw_page + record_offset))
+        {
+            /* get the record. */
+            record_attrs_to_tuple(raw_page + record_offset, data);
+         
+            /* return the data. */
+            rid.pageNum = page_id;
+            rid.slotNum = slot_id;
+         
+            /* work on the next slot next time the iterator is called. */
+            slot_id++;
+
+            return 0;
+        }
+
+        /* otherwise keep searching. */
+        slot_id++;
+
+        /* reached the end of slots, need to go to next data page. */
+        if (slot_id == num_slots)
+        {
+            /* make sure we skip control pages/select only the next data page. */
+            page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+            slot_id = num_slots = 0;
+
+            /* confirm that it's in bounds. */
+            if(page_id >= n_pages)
+                return RM_EOF;
+
+            /* bring in the new page. */ 
+            if (handle.ReadPage(page_id, raw_page))
+                return -1;
+
+            if((RM::Instance())->debug)
+                RM::debug_data_page(raw_page, "scanning data page");
+            num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+        }
+    }
+
+    return 0;
+}
 
 RC RM_ScanIterator::close()
 {
