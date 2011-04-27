@@ -23,6 +23,7 @@ RM::RM()
 {
     pf = PF_Manager::Instance();
 
+    debug = false;
     /* find system catalog file, create an open file handle, and empty map to cache open tables. */
     /* XXX: put code to open system catalog. */
 }
@@ -828,6 +829,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if (handle.ReadPage(page_id, raw_page))
         return -1;
 
+    if(debug)
     {
         debug_data_page(raw_page, "before insertTuple");
         cout << "available space on page: " << avail_space << endl;
@@ -902,6 +904,7 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if (decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t)))
         return -1;
 
+    if(debug)
     {
         debug_data_page(raw_page, "after insertTuple");
         getPageSpace(handle, page_id, avail_space);
@@ -1049,6 +1052,7 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
         if (increasePageSpace(handle, rid.pageNum, REC_TUPLE_REDIR_LENGTH + n_slots_deleted * sizeof(uint16_t)))
             return -1;
 
+        if(debug)
         {
             uint16_t avail_space;
             getPageSpace(handle, rid.pageNum, avail_space);
@@ -1068,9 +1072,9 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     /* align to the nearest even byte, we know this isn't in use since records/free space begins on even bytes. */
     record_end_offset += IS_ODD(record_end_offset) ? 1 : 0;
 
-    cout << "GOING TO DELETE: " << record_length << " at slot: " << rid.slotNum << " with offset: " << record_offset << " to " << record_end_offset << endl;
-
+    if(debug)
     {
+        cout << "GOING TO DELETE: " << record_length << " at slot: " << rid.slotNum << " with offset: " << record_offset << " to " << record_end_offset << endl;
         uint16_t avail_space;
         getPageSpace(handle, rid.pageNum, avail_space);
         debug_data_page(raw_page, "before delete");
@@ -1102,6 +1106,7 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     if (increasePageSpace(handle, rid.pageNum, space_deleted + n_slots_deleted * sizeof(uint16_t)))
         return -1;
 
+    if(debug)
     {
         uint16_t avail_space;
         getPageSpace(handle, rid.pageNum, avail_space);
@@ -1183,6 +1188,8 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 
     /* get the beginning offset from the slot associated with the record. */
     old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
+
+    if(debug)
     {
         stringstream ss;
         ss << "before update: slot: " << rid.slotNum << " newlength: " << update_record_length << " ]";
@@ -1263,7 +1270,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         if (increasePageSpace(handle, rid.pageNum, n_deleted_space))
             return -1;
 
-        
+        if(debug)
         {
             uint16_t new_space;
             debug_data_page(raw_page, "after update: record shrink");
@@ -1311,6 +1318,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 if (handle.WritePage(rid.pageNum, raw_page))
                     return -1;
 
+                if(debug)
                 {
                     uint16_t new_space;
                     debug_data_page(raw_page, "after update: record shrink");
@@ -1366,6 +1374,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                     if (handle.WritePage(rid.pageNum, raw_page))
                         return -1;
 
+                    if(debug)
                     {
                         uint16_t new_space;
                         debug_data_page(raw_page, "after update: record redirect");
@@ -1418,6 +1427,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                     if (handle.WritePage(rid.pageNum, raw_page))
                         return -1;
 
+                    if(debug)
                     {
                         uint16_t new_space;
                         debug_data_page(raw_page, "after update: record appended at end of page");
@@ -1477,6 +1487,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 if (handle.WritePage(rid.pageNum, raw_page))
                     return -1;
             
+                if(debug)
                 {
                     uint16_t new_space;
                     debug_data_page(raw_page, "after update: record grow");
@@ -1528,6 +1539,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                     if (handle.WritePage(rid.pageNum, raw_page))
                         return -1;
 
+                    if(debug)
                     {
                         uint16_t new_space;
                         debug_data_page(raw_page, "after update: record grow (relocated to free space offset)");
@@ -1582,6 +1594,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                         if (handle.WritePage(rid.pageNum, raw_page))
                             return -1;
     
+                        if(debug)
                         {
                             uint16_t new_space;
                             debug_data_page(raw_page, "after update: record redirect");
@@ -1631,6 +1644,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                         if (handle.WritePage(rid.pageNum, raw_page))
                             return -1;
     
+                        if(debug)
                         {
                             uint16_t new_space;
                             debug_data_page(raw_page, "after update: record appended at end of page");
@@ -1952,10 +1966,13 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber) // {{{
 
     slot_page[SLOT_FREE_SPACE_INDEX] = new_free_space_offset;
 
-    debug_data_page(raw_page, "after reorg");
-    getPageSpace(handle, pageNumber, avail_space);
-    cout << "available space: " << avail_space << endl;
-    assert(SLOT_GET_FREE_SPACE(slot_page) == avail_space);
+    if(debug)
+    {
+        debug_data_page(raw_page, "after reorg");
+        getPageSpace(handle, pageNumber, avail_space);
+        cout << "available space: " << avail_space << endl;
+        assert(SLOT_GET_FREE_SPACE(slot_page) == avail_space);
+    }
      
     /* write back page. */
     if (handle.WritePage(pageNumber, raw_page))
@@ -2148,6 +2165,7 @@ void RM::reorganizePage(uint8_t *raw_page, const RID &rid, PF_FileHandle handle)
 
     slot_page[SLOT_FREE_SPACE_INDEX] = new_free_space_offset;
 
+    if(debug)
     {
         debug_data_page(raw_page, "after reorg");
         getPageSpace(handle, rid.pageNum, avail_space);
@@ -2209,7 +2227,6 @@ RC RM::scan(const string tableName,
     unsigned int n_ctrl_pages;
     unsigned int n_data_pages;
 
-
     /* attribute of fields to read. */
     vector<Attribute> attrs;
 
@@ -2232,6 +2249,10 @@ RC RM::scan(const string tableName,
         attrs_pos.push_back(attr_pos);
     }
 
+    /* open table to get number of pages. */
+    if (openTable(tableName, handle))
+        return -1;
+
     /* need to know the amount of data pages to scan. */
     n_pages = handle.GetNumberOfPages();
     n_ctrl_pages = CTRL_NUM_CTRL_PAGES(n_pages);
@@ -2243,6 +2264,8 @@ RC RM::scan(const string tableName,
     rm_ScanIterator.n_pages = n_pages;
     rm_ScanIterator.n_data_pages = n_data_pages;
     rm_ScanIterator.n_ctrl_pages = n_ctrl_pages;
+    rm_ScanIterator.page_id = 0;
+    rm_ScanIterator.slot_id = 0;
     rm_ScanIterator.handle = handle;
 
     return 0;
@@ -2272,23 +2295,37 @@ RC RM::debug_data_page(const string tableName, unsigned int page_id, const char 
 
 void RM_ScanIterator::record_attrs_to_tuple(uint8_t *record, void *data)
 {
-}
+    /* keep a pointer to where data needs to be packed. */
+    uint8_t *tuple_ptr = (uint8_t *) data;
 
-RC RM_ScanIterator::updateNextPage()
-{
-    if (n_pages <= 1)
-        return RM_EOF;
+    /* leverage existing work by record_attr_to_tuple to pack everything into data. */
 
-    if (slot_id >= num_slots)
+    for(unsigned int i = 0; i < attrs.size(); i++)
     {
-        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
-        slot_id = num_slots = 0;
+        RM::record_attr_to_tuple(record, tuple_ptr, attrs[i], attrs_pos[i]);
+
+        if (attrs[i].type == TypeInt)
+        {
+            /* skip the int. */
+            tuple_ptr += sizeof(int);
+        }
+        else if (attrs[i].type == TypeReal)
+        {
+            /* skip the float. */
+            tuple_ptr += sizeof(float);
+        }
+        else if (attrs[i].type == TypeVarChar)
+        {
+            int length;
+            memcpy(&length, tuple_ptr, sizeof(length));
+
+            /* skip the length field. */
+            tuple_ptr += sizeof(length);
+
+            /* skip varchar data. */
+            tuple_ptr += length;
+        }
     }
-
-    if(page_id >= n_pages)
-        return RM_EOF;
-
-    return 0;
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
@@ -2300,37 +2337,33 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
     /* record offset. */
     uint16_t record_offset;
 
-     /* need at least a control and data page to iterate. */
-     if (n_pages <= 2)
-        return RM_EOF;
+    /* need at least a control and data page to iterate. */
+    if (n_pages < 2)
+       return RM_EOF;
 
-     if(page_id == 0)
-         page_id = 1;
+    if(page_id == 0)
+        page_id = 1;
 
-     if(page_id >= n_pages)
+    if(page_id >= n_pages)
         return RM_EOF;
       
     /* bring in the page. */ 
     if (handle.ReadPage(page_id, raw_page))
         return -1;
 
-    /* update the slot count if necessary. */
-    if (slot_id == 0)
-    {
+    if(slot_id == 0 && (RM::Instance())->debug)
         RM::debug_data_page(raw_page, "scanning data page");
-        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
-    }
 
-    0,1,2,3,4
-    I I I I I
-    
+    /* update the slot count. */
+    num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
     /* find first active slot, get the record offset. */
     while(slot_id < num_slots)
     {
         record_offset = SLOT_GET_SLOT(slot_page, slot_id);
 
         /* if all crtieria are met, then we can use this slot id to get a record. */
-        if(slot_id < num_slots && SLOT_IS_ACTIVE(record_offset) && REC_IS_RECORD(record_offset))
+        if(slot_id < num_slots && SLOT_IS_ACTIVE(record_offset) && REC_IS_RECORD(raw_page + record_offset))
             break;
 
         /* otherwise keep searching. */
@@ -2339,6 +2372,7 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
         /* reached the end of slots, need to go to next data page. */
         if (slot_id == num_slots)
         {
+            /* make sure we skip control pages/select only the next data page. */
             page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
             slot_id = num_slots = 0;
 
@@ -2350,41 +2384,20 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
             if (handle.ReadPage(page_id, raw_page))
                 return -1;
 
-            RM::debug_data_page(raw_page, "scanning data page");
+            if((RM::Instance())->debug)
+                RM::debug_data_page(raw_page, "scanning data page");
             num_slots = SLOT_GET_NUM_SLOTS(slot_page);
         }
     }
 
+    /* get the record. */
+    record_attrs_to_tuple(raw_page + record_offset, data);
 
-//    /* iterate over the data pages. */
-//    for (unsigned int i = 0; i < n_ctrl_pages; i++)
-//    {
-//        /* get the page id for i-th control page. */
-//        unsigned int ctrl_page_id = CTRL_PAGE_ID(i);
-//
-//        unsigned int n_allocated_pages = CTRL_MAX_PAGES;
-//
-//        /* if we're on the last control page, only iterate over remaining allocated pages,
-//           since the control page might not control all possible pages.
-//        */
-//        if ((n_ctrl_pages - 1) == i)
-//            n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
-//
-////RC RM::getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition)
-//
-//        /* read in control page. */
-//        if (handle.ReadPage(ctrl_page_id, (void *) ctrl_page))
-//            return -1;
-//
-//        for (unsigned int j = 0; j < n_allocated_pages; j++)
-//        {
-//            page_id = ctrl_page_id + (j + 1); // page index is offset by 1.
-//
-//            /* so i read in the page, go through slot directory, pick each record. */
-//            /* now what the fuck do i do with the ScanIterator? */
-//        }
-//    }
+    /* return the data. */
+    rid.pageNum = page_id;
+    rid.slotNum = slot_id;
 
+    /* work on the next slot. */
     slot_id++;
 
     /* update next slot id. */
@@ -2396,6 +2409,7 @@ RC RM_ScanIterator::close()
 {
     page_id = 0;
     slot_id = 0;
+    num_slots = 0;
 
     return 0;
 };
