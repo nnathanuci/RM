@@ -37,7 +37,9 @@ using namespace std;
 
 #define REC_TUPLE_REDIR_LENGTH (sizeof(uint16_t) + sizeof(unsigned int))
 
-/* if considered a stream of data that could be either a record or tuple redirect, use the first field to identify the type. */
+/* if considered a stream of data that could be either a record or tuple redirect, use the first field to identify the type.
+   a tuple redirect on the page begins is offset by 4096, and must always remaind less than FRAGMENT_WORD.
+*/
 #define REC_IS_TUPLE_REDIR(start) (((*((uint16_t *) (start))) > REC_TUPLE_MARKER) && ((*((uint16_t *) (start))) < 0xFFFF))
 #define REC_IS_RECORD(start) ((*((uint16_t *) (start))) < PF_PAGE_SIZE)
 
@@ -268,6 +270,12 @@ public:
   /* close all tables in open_tables. */
   RC closeAllTables();
 
+  /* dump the page information given a pointer to the data page. */
+  void debug_data_page(uint8_t *raw_page, const char *annotation);
+
+  /* dump the page information given a the page id. */
+  RC debug_data_page(const string tableName, unsigned int page_id, const char *annotation);
+
 private:
 
   /* allocate & append control page to a given database file. */
@@ -287,11 +295,6 @@ private:
   /* deactivateSlot returns the number of slots deleted to activate a given slot in the directory. [number of slots deleted is unbounded] */
   uint16_t deactivateSlot(uint16_t *slot_page, uint16_t slot_id);
 
-  /* dump the page information given a pointer to the data page. */
-  void debug_data_page(uint8_t *raw_page, const char *annotation);
-
-  /* dump the page information given a the page id. */
-  void debug_data_page(unsigned int page_id);
 
   PF_Manager *pf;
   map<string, vector<Attribute> > catalog;
