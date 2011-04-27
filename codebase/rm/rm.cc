@@ -25,7 +25,47 @@ RM::RM()
 
     debug = false;
     /* find system catalog file, create an open file handle, and empty map to cache open tables. */
+
     /* XXX: put code to open system catalog. */
+
+    /* hardcoded system catalogue attributse, pre-populated. */
+    {
+        Attribute attr;
+
+        attr.name = "tablename";
+        attr.type = TypeVarChar;
+        attr.length = (AttrLength) MAX_CAT_NAME_LEN;
+        system_catalog_attrs.push_back(attr);
+
+        attr.name = "attribute";
+        attr.type = TypeVarChar;
+        attr.length = (AttrLength) MAX_CAT_NAME_LEN;
+        system_catalog_attrs.push_back(attr);
+
+        attr.name = "position";
+        attr.type = TypeInt;
+        attr.length = sizeof(unsigned int);
+        system_catalog_attrs.push_back(attr);
+
+        attr.name = "type";
+        attr.type = TypeInt;
+        attr.length = sizeof(unsigned int);
+        system_catalog_attrs.push_back(attr);
+
+        attr.name = "length";
+        attr.type = TypeInt;
+        attr.length = sizeof(unsigned int);
+        system_catalog_attrs.push_back(attr);
+
+        system_catalog_tablename = SYSTEM_CAT_TABLENAME;
+    }
+
+    /* open the system catalog, cache the handle */
+    {
+        PF_FileHandle handle;
+
+        openTable(system_catalog_tablename, handle);
+    }
 }
 
 RM::~RM()
@@ -289,11 +329,30 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
         return 0;
     }
 
-    /* table not open: open table, retrieve and cache handle. */
+    if(tableName == system_catalog_tablename)
+    {
+        /* special case: system catalogue */
 
-    /* open file and retrieve handle. */
-    if (pf->OpenFile(tableName.c_str(), handle))
-        return -1;
+        /* it exists, we open it, and all is well. */
+        if(pf->OpenFile(tableName.c_str(), handle))
+        {
+            /* need to create the system catalogue then. */
+            if (pf->CreateFile(tableName.c_str()))
+                return -1;
+
+            /* attempt to open again and retrieve the handle. */
+            if(pf->OpenFile(tableName.c_str(), handle))
+                return -1;
+        }
+    }
+    else
+    {
+        /* non system catalogue table not open: open table, retrieve and cache handle. */
+
+        /* open file and retrieve handle. */
+        if (pf->OpenFile(tableName.c_str(), handle))
+            return -1;
+    }
 
     /* cache handle for later use. */
     open_tables[tableName] = handle;
@@ -306,6 +365,10 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
 
 RC RM::closeTable(const string tableName) // {{{
 {
+    /* refuse to close the system catalog table, it shouldn't be manipulated from the outside. */
+    if(tableName == system_catalog_tablename)
+        return -1;
+
     /* check to make sure the table handle is cached. */
     if (open_tables.count(tableName))
     {
