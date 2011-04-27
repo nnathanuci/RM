@@ -577,6 +577,8 @@ int main()
     /* cleanup: delete stale tables */
     cleanup();
 
+    rm->debug = false;
+
     // Basic Functions
     cout << "Test Basic Functions..." << endl;
 
