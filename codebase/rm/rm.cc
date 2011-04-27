@@ -1646,38 +1646,81 @@ RC RM::scan(const string tableName,
 {
      /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
+    uint8_t ctrl_page[PF_PAGE_SIZE];
     uint16_t *slot_page = (uint16_t *) raw_page;
 
     /* number of pages: control/data */
-    uint16_t n_pages;
-    uint16_t n_control_pages;
-    uint16_t n_data_pages;
+    unsigned int n_pages;
+    unsigned int n_ctrl_pages;
+    unsigned int n_data_pages;
+
+
+    /* current page id being read in. */
+    unsigned int page_id;
 
     /* offset in page where the record begins. */
     uint16_t record_offset;
 
     /* attribute of fields to read. */
     vector<Attribute> attrs;
-    vector<int> attr_pos;
 
-    /* attribute position. */
-    uint16_t attr_position;
+    /* attribute positions. */
+    vector<uint16_t> attrs_pos;
 
     /* handle for database. */
     PF_FileHandle handle;
 
-    /* retrieve table attributes. */
-    if(getAttribute(tableName, attributeName, attr, attr_position))
-        return -1;
+    /* retrieve each attribute. */
+    for(unsigned int i = 0; i < attributeNames.size(); i++)
+    {
+        Attribute attr;
+        uint16_t attr_pos;
+
+        if(getAttribute(tableName, attributeNames[i], attr, attr_pos))
+            return -1;
+
+        attrs.push_back(attr);
+        attrs_pos.push_back(attr_pos);
+    }
 
     /* open table to read in page. */
     if(openTable(tableName, handle))
         return -1;
 
-    /* read in data page */
-    if(handle.ReadPage(rid.pageNum, raw_page))
-        return -1;
-   
+    /* need to know the amount of data pages to scan. */
+    n_pages = handle.GetNumberOfPages();
+    n_ctrl_pages = CTRL_NUM_CTRL_PAGES(n_pages);
+    n_data_pages = CTRL_NUM_DATA_PAGES(n_pages);
+
+    /* iterate over the data pages. */
+    for(unsigned int i = 0; i < n_ctrl_pages; i++)
+    {
+        /* get the page id for i-th control page. */
+        unsigned int ctrl_page_id = CTRL_PAGE_ID(i);
+
+        unsigned int n_allocated_pages = CTRL_MAX_PAGES;
+
+        /* if we're on the last control page, only iterate over remaining allocated pages,
+           since the control page might not control all possible pages.
+        */
+        if((n_ctrl_pages - 1) == i)
+            n_allocated_pages = n_data_pages % CTRL_MAX_PAGES;
+
+//RC RM::getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition)
+
+        /* read in control page. */
+        if(handle.ReadPage(ctrl_page_id, (void *) ctrl_page))
+            return -1;
+
+        for(unsigned int j = 0; j < n_allocated_pages; j++)
+        {
+            page_id = ctrl_page_id + (j + 1); // page index is offset by 1.
+
+            /* so i read in the page, go through slot directory, pick each record. */
+            /* now what the fuck do i do with the ScanIterator? */
+        }
+    }
+
     return -1;
 }
 // }}}
