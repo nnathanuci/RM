@@ -925,8 +925,26 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
 
     /* check if it's a record, otherwise follow redirect. */
 
-    /* copy record to tuple buffer. */
-    record_to_tuple(raw_page + record_offset, data, attrs);
+    if(REC_IS_TUPLE_REDIR(raw_page + record_offset))
+    {
+        /* auxillary record id which is retrieved from the tuple redirection. */
+        RID aux;
+
+        /* point to the tuple redirection in the page. */
+
+        /* get the slot id, and discard the tuple marker. */
+        aux.slotNum = *((uint16_t *) (raw_page + record_offset)) - REC_TUPLE_MARKER;
+        aux.pageNum = *((unsigned int *) (raw_page + record_offset + sizeof(uint16_t)));
+
+        /* read in from the redirected tuple. */
+        if(readTuple(tableName, aux, data))
+            return -1;
+    }
+    else
+    {
+        /* copy record to tuple buffer. */
+        record_to_tuple(raw_page + record_offset, data, attrs);
+    }
 
     /* we're done, wasn't that hard? */
     return 0;
