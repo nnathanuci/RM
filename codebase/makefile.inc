@@ -5,4 +5,4 @@ CODEROOT = "../"
 CC = g++
 
 #CPPFLAGS = -Wall -I$(CODEROOT) -O3  # maximal optimization
-CPPFLAGS = -Wall -I$(CODEROOT) -g     # with debugging info
+CPPFLAGS = -Wall -I$(CODEROOT) -g3     # with debugging info
