@@ -1016,6 +1016,8 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
 
+    /* XXX: check if tuple is redirect. */
+
     /* get the beginning offset from the slot associated with the record. */
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
     record_length = REC_LENGTH(raw_page + record_offset);
@@ -1131,6 +1133,8 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     /* ensure slot is active. */
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
+
+    /* XXX: check if tuple is a redirect. */
 
     /* get the beginning offset of free space. */
     free_space_offset = slot_page[SLOT_FREE_SPACE_INDEX];
@@ -1287,6 +1291,9 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                     if(insertTuple(tableName, data, aux))
                         return -1;
 
+                    /* add the slot_id to the marker. */
+                    slot_id += aux.slotNum;
+
                     /* write out the tuple redirect. */
                     memcpy(raw_page + old_record_offset, &slot_id, sizeof(slot_id));
                     memcpy(raw_page + old_record_offset + sizeof(slot_id), &aux.pageNum, sizeof(aux.pageNum));
@@ -1295,7 +1302,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                     slot_page[SLOT_FREE_SPACE_INDEX] = old_record_offset + REC_TUPLE_REDIR_LENGTH;
 
                     /* update control information about new space. */
-                    decreasePageSpace(handle, rid.pageNum, n_freed_space);
+                    increasePageSpace(handle, rid.pageNum, n_freed_space);
     
                     /* write back page. */
                     if(handle.WritePage(rid.pageNum, raw_page))
@@ -1473,8 +1480,6 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 }
                 else if(update_record_length > free_space)
                 {
-                    /* XXX: working here */
-
                     /* doesn't fit in the free space, we need to see if compaction will work. */
                     uint16_t needed_space = update_record_length - old_record_length;
 
@@ -1502,15 +1507,18 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                         if(insertTuple(tableName, data, aux))
                             return -1;
     
+                        /* add slot id to the marker. */
+                        slot_id += aux.slotNum;
+
                         /* write out the tuple redirect. */
                         memcpy(raw_page + old_record_offset, &slot_id, sizeof(slot_id));
                         memcpy(raw_page + old_record_offset + sizeof(slot_id), &aux.pageNum, sizeof(aux.pageNum));
     
                         /* write fragment data in the remaining space. */
-                        memset(raw_page + old_record_offset, SLOT_FRAGMENT_BYTE, n_freed_space);
+                        memset(raw_page + old_record_offset + sizeof(slot_id) + sizeof(aux.pageNum), SLOT_FRAGMENT_BYTE, n_freed_space);
 
                         /* update control information about new space. */
-                        decreasePageSpace(handle, rid.pageNum, n_freed_space);
+                        increasePageSpace(handle, rid.pageNum, n_freed_space);
         
                         /* write back page. */
                         if(handle.WritePage(rid.pageNum, raw_page))
@@ -2088,7 +2096,6 @@ void RM::reorganizePage(uint8_t *raw_page, const RID &rid, PF_FileHandle handle)
         cout << "available space: " << avail_space << endl;
     }
 } // }}}
-
 
 RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) // {{{
 {
