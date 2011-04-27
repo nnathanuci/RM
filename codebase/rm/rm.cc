@@ -1103,6 +1103,9 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     /* beginning offset of free space. */
     uint16_t free_space_offset;
 
+    /* the actual amount of free space. */
+    uint16_t free_space  = 0;
+
     /* attributes to determine data packing format. */
     vector<Attribute> attrs;
 
@@ -1132,6 +1135,9 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     /* get the beginning offset of free space. */
     free_space_offset = slot_page[SLOT_FREE_SPACE_INDEX];
 
+    /* get the free space available in the page. */
+    free_space = SLOT_GET_FREE_SPACE(slot_page);
+
     /* get the beginning offset from the slot associated with the record. */
     old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
     old_record_length = REC_LENGTH(raw_page + old_record_offset);
@@ -1151,6 +1157,8 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     }
 
 
+
+    /* don't have time to fix this, but this function can really be compressed by distinguishing between growing at the free offset and not. */
 
     /* if the new record is shrinking, then overwrite and write back page. */
     if(update_record_length <= old_record_length)
@@ -1212,7 +1220,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         if(old_record_end_offset_even == free_space_offset)
         {
             /* if it fits in free space, then we're good. */
-            if(update_record_length <= (old_record_length + SLOT_GET_FREE_SPACE(slot_page)))
+            if(update_record_length <= (free_space + old_record_length))
             {
                 /* overwrite record. */
                 memcpy(raw_page + old_record_offset, update_record, update_record_length);
@@ -1250,17 +1258,18 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 
                 return 0;
             }
-            else if(update_record_length > (old_record_length + SLOT_GET_FREE_SPACE(slot_page)))
+            else if(update_record_length > (free_space + old_record_length))
             {
-                /* doesn't fit in the free space, we ned to see if compaction will work. */
+                /* doesn't fit in the free space, we need to see if compaction will work. */
                 uint16_t needed_space = update_record_length - old_record_length;
 
                 /* check if there's enough available space. */
                 getPageSpace(handle, rid.pageNum, avail_space);
 
-                /* cannot possibly grow the record on this page, we need to write a redirect. */
                 if(needed_space > avail_space)
                 {
+                    /* cannot possibly grow the record on this page, we need to write a redirect. */
+
                     /* auxillary record id returned from insertTuple. */
                     RID aux;
 
@@ -1302,7 +1311,8 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
                 else if(needed_space <= avail_space)
                 {
                     /* space that will be used up. */
-                    uint16_t n_used_space = avail_space - needed_space;
+                    uint16_t n_used_space = needed_space;
+
                     /* we have enough space, mark the old record as a fragment, compact, then append. */
                     memset(raw_page + old_record_offset, SLOT_FRAGMENT_BYTE, old_record_end_offset_even - old_record_offset);
 
@@ -1371,7 +1381,7 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
             /* now include the residue byte. */
             if(IS_ODD(old_record_length))
                 fragment_byte_used = true, fragment_space++;
-            
+
             /* check to see if it can fit between the end of the old record and adjacent space. */
             if(needed_space <= fragment_space)
             {
@@ -1411,17 +1421,162 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 
                 return 0;
             }
-            else
+            else if(needed_space > fragment_space)
             {
+                if(update_record_length <= free_space)
+                {
+                    uint16_t n_used_space = needed_space;
+
+                    /* relocate record at the free space offset, turn old record into a fragment. */
+
+                    /* write data to free space offset. */
+                    memcpy(raw_page + free_space_offset, update_record, update_record_length);
+
+                    /* update the slot information with the new offset. */
+                    slot_page[SLOT_GET_SLOT_INDEX(rid.slotNum)] = free_space_offset;
+
+                    /* determine end offset for new record. */
+                    update_record_end_offset_even = free_space_offset + update_record_length;
+
+                    /* mark the byte as a fragment if not on an even boundary. */
+                    if(IS_ODD(update_record_length))
+                    {
+                        /* write out a fragment byte in the unusable space. */
+                        memset(raw_page + old_record_offset + update_record_length, SLOT_FRAGMENT_BYTE, 1);
+    
+                        /* we also need to update the fact we're occupying that byte. */
+                        n_used_space++;
                 
-                /* need to tuple redirect. */
+                        /* align the end offset to nearest even byte. */
+                        update_record_end_offset_even++;
+                    }
+
+                    /* mark the old record as a fragment. */
+                    memset(raw_page + old_record_offset, SLOT_FRAGMENT_BYTE, old_record_end_offset_even - old_record_offset);
+
+                    /* update free space offset to end of relocated record. */
+                    slot_page[SLOT_FREE_SPACE_INDEX] = update_record_end_offset_even;
+
+                    decreasePageSpace(handle, rid.pageNum, n_used_space);
+                
+                    /* write back page. */
+                    if(handle.WritePage(rid.pageNum, raw_page))
+                        return -1;
+
+                    {
+                        uint16_t new_space;
+                        debug_data_page(raw_page, "after update: record grow (relocated to free space offset)");
+                        getPageSpace(handle, rid.pageNum, new_space);
+                        cout << "available space on page: " << new_space << endl;
+                    }
+
+                }
+                else if(update_record_length > free_space)
+                {
+                    /* XXX: working here */
+
+                    /* doesn't fit in the free space, we need to see if compaction will work. */
+                    uint16_t needed_space = update_record_length - old_record_length;
+
+                    /* check if there's enough available space. */
+                    getPageSpace(handle, rid.pageNum, avail_space);
+
+                    if(needed_space > avail_space)
+                    {
+                        /* cannot possibly grow the record on this page, we need to write a redirect. */
+
+                        /* auxillary record id returned from insertTuple. */
+                        RID aux;
+    
+                        /* the amount we need to decrease for the page. */
+                        uint16_t n_freed_space = old_record_end_offset_even - (old_record_offset + REC_TUPLE_REDIR_LENGTH);
+    
+                        /* marker + slot_id, makes it distinguishable as a tuple redirect. */
+                        uint16_t slot_id = REC_TUPLE_MARKER;
+    
+                        /* reclaim the fragment byte if the old record ended on an odd byte boundary. */
+                        if(IS_ODD(old_record_length))
+                            n_freed_space++;
+    
+                        /* insert the new tuple, get the new RID */
+                        if(insertTuple(tableName, data, aux))
+                            return -1;
+    
+                        /* write out the tuple redirect. */
+                        memcpy(raw_page + old_record_offset, &slot_id, sizeof(slot_id));
+                        memcpy(raw_page + old_record_offset + sizeof(slot_id), &aux.pageNum, sizeof(aux.pageNum));
+    
+                        /* write fragment data in the remaining space. */
+                        memset(raw_page + old_record_offset, SLOT_FRAGMENT_BYTE, n_freed_space);
+
+                        /* update control information about new space. */
+                        decreasePageSpace(handle, rid.pageNum, n_freed_space);
+        
+                        /* write back page. */
+                        if(handle.WritePage(rid.pageNum, raw_page))
+                            return -1;
+    
+                        {
+                            uint16_t new_space;
+                            debug_data_page(raw_page, "after update: record redirect");
+                            getPageSpace(handle, rid.pageNum, new_space);
+                            cout << "available space on page: " << new_space << endl;
+                        }
+                    }
+                    else if(needed_space <= avail_space)
+                    {
+                        /* space that will be used up. */
+                        uint16_t n_used_space = needed_space;
+
+                        /* we have enough space, mark the old record as a fragment, compact, then append. */
+                        memset(raw_page + old_record_offset, SLOT_FRAGMENT_BYTE, old_record_end_offset_even - old_record_offset);
+    
+                        /* compact the page to squeeze out some more space. */
+                        reorganizePage(raw_page, rid, handle);
+    
+                        /* update free space offset since it changed after compaction. */
+                        free_space_offset = slot_page[SLOT_FREE_SPACE_INDEX];
+    
+                        /* append record at free space pointer. */
+                        memcpy(raw_page + free_space_offset, update_record, update_record_length);
+    
+                        /* update the slot with relocated offset. */
+                        slot_page[SLOT_GET_SLOT_INDEX(rid.slotNum)] = free_space_offset;
+    
+                        /* write fragment byte in residue. */
+                        if(IS_ODD(update_record_length))
+                        {
+                            memset(raw_page + free_space_offset + update_record_length, SLOT_FRAGMENT_BYTE, 1);
+    
+                            /* we consider this part of the needed space. */
+                            n_used_space++;
+    
+                            /* record length is on even boundary. */
+                            update_record_length++;
+                        }
+    
+                        /* move free space offset to end of update record. */
+                        slot_page[SLOT_FREE_SPACE_INDEX] += update_record_length;
+    
+                        /* update control information about new space. */
+                        decreasePageSpace(handle, rid.pageNum, n_used_space);
+        
+                        /* write back page. */
+                        if(handle.WritePage(rid.pageNum, raw_page))
+                            return -1;
+    
+                        {
+                            uint16_t new_space;
+                            debug_data_page(raw_page, "after update: record appended at end of page");
+                            getPageSpace(handle, rid.pageNum, new_space);
+                            cout << "available space on page: " << new_space << endl;
+                        }
+                    }
+                }
             }
 	}
     }
 
-    {
-        debug_data_page(raw_page, "after update");
-    }
     /* done. */
     return 0;
 } // }}}
