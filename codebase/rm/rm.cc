@@ -2274,42 +2274,87 @@ void RM_ScanIterator::record_attrs_to_tuple(uint8_t *record, void *data)
 {
 }
 
-unsigned int RM_ScanIterator::getNextPage()
+RC RM_ScanIterator::updateNextPage()
 {
-    if (page_id == 0)
-        return 1;
+    if (n_pages <= 1)
+        return RM_EOF;
 
-    if (slot_id > num_slots)
-        return CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+    if (slot_id >= num_slots)
+    {
+        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+        slot_id = num_slots = 0;
+    }
+
+    if(page_id >= n_pages)
+        return RM_EOF;
+
+    return 0;
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
-    uint16_t *slot_page = raw_page;
+    uint16_t *slot_page = (uint16_t *) raw_page;
 
-    /* if there's only one page, it can only be the control page. We're done. */
-    if (n_pages <= 1)
+    /* record offset. */
+    uint16_t record_offset;
+
+     /* need at least a control and data page to iterate. */
+     if (n_pages <= 2)
         return RM_EOF;
 
-    /* get next page, check to make sure it's addressable, also reset the slot count.  */
-    if ((page_id = getNextPage()) < n_pages)
-    {
-        slot_id = 0;
-        num_slots = 0;
-    }
-    else
-    {
+     if(page_id == 0)
+         page_id = 1;
+
+     if(page_id >= n_pages)
         return RM_EOF;
-    }
-        
+      
     /* bring in the page. */ 
     if (handle.ReadPage(page_id, raw_page))
         return -1;
 
     /* update the slot count if necessary. */
-    if (
+    if (slot_id == 0)
+    {
+        RM::debug_data_page(raw_page, "scanning data page");
+        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    }
+
+    0,1,2,3,4
+    I I I I I
+    
+    /* find first active slot, get the record offset. */
+    while(slot_id < num_slots)
+    {
+        record_offset = SLOT_GET_SLOT(slot_page, slot_id);
+
+        /* if all crtieria are met, then we can use this slot id to get a record. */
+        if(slot_id < num_slots && SLOT_IS_ACTIVE(record_offset) && REC_IS_RECORD(record_offset))
+            break;
+
+        /* otherwise keep searching. */
+        slot_id++;
+
+        /* reached the end of slots, need to go to next data page. */
+        if (slot_id == num_slots)
+        {
+            page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+            slot_id = num_slots = 0;
+
+            /* confirm that it's in bounds. */
+            if(page_id >= n_pages)
+                return RM_EOF;
+
+            /* bring in the new page. */ 
+            if (handle.ReadPage(page_id, raw_page))
+                return -1;
+
+            RM::debug_data_page(raw_page, "scanning data page");
+            num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+        }
+    }
+
 
 //    /* iterate over the data pages. */
 //    for (unsigned int i = 0; i < n_ctrl_pages; i++)
@@ -2340,7 +2385,10 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
 //        }
 //    }
 
-    return RM_EOF;
+    slot_id++;
+
+    /* update next slot id. */
+    return 0;
 }
 
 
