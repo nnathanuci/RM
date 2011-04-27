@@ -344,6 +344,17 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
             if(pf->OpenFile(tableName.c_str(), handle))
                 return -1;
         }
+
+        /* populate the attributes in the catalog. */
+        catalog[system_catalog_tablename] = system_catalog_attrs;
+
+        /* add fields for quick lookup (table.fieldname) */
+        for (unsigned int i = 0; i < system_catalog_attrs.size(); i++)
+        {
+            catalog_fields[system_catalog_tablename+"."+system_catalog_attrs[i].name] = system_catalog_attrs[i];
+            catalog_fields_position[system_catalog_tablename+"."+system_catalog_attrs[i].name] = i;
+        }
+
     }
     else
     {
@@ -352,6 +363,8 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
         /* open file and retrieve handle. */
         if (pf->OpenFile(tableName.c_str(), handle))
             return -1;
+
+        /* XXX: scan the attributes */
     }
 
     /* cache handle for later use. */
@@ -501,6 +514,10 @@ RC RM::getAttribute(const string tableName, const string attributeName, Attribut
 RC RM::deleteTable(const string tableName) // {{{
 {
     vector<Attribute> attrs;
+
+    /* cannot delete the system catalogue. */
+    if (tableName == system_catalog_tablename)
+        return -1;
 
     /* table doesnt exists. */
     if (!catalog.count(tableName))
