@@ -40,7 +40,7 @@ using namespace std;
 /* if considered a stream of data that could be either a record or tuple redirect, use the first field to identify the type.
    a tuple redirect on the page begins is offset by 4096, and must always remaind less than FRAGMENT_WORD.
 */
-#define REC_IS_TUPLE_REDIR(start) (((*((uint16_t *) (start))) > REC_TUPLE_MARKER) && ((*((uint16_t *) (start))) < 0xFFFF))
+#define REC_IS_TUPLE_REDIR(start) (((*((uint16_t *) (start))) >= REC_TUPLE_MARKER) && ((*((uint16_t *) (start))) < 0xFFFF))
 #define REC_IS_RECORD(start) ((*((uint16_t *) (start))) < PF_PAGE_SIZE)
 
 /* determines number of page offsets stored in a control page. */
@@ -173,13 +173,30 @@ typedef enum { EQ_OP = 0,  // =
 //  rmScanIterator.close();
 
 class RM_ScanIterator {
+private:
+  void record_attrs_to_tuple(uint8_t *record, void *data);
+  RC updateNextPage();
+
 public:
-  RM_ScanIterator() {};
+  RM_ScanIterator() { page_id = slot_id = 0;};
   ~RM_ScanIterator() {};
 
+  vector<Attribute> attrs;
+  vector<uint16_t> attrs_pos;
+
+  unsigned int n_pages;
+  unsigned int n_data_pages;
+  unsigned int n_ctrl_pages;
+  unsigned int page_id;
+  unsigned int slot_id;
+  unsigned int num_slots;
+
+  PF_FileHandle handle;
+
   // "data" follows the same format as RM::insertTuple()
-  RC getNextTuple(RID &rid, void *data) { return RM_EOF; };
-  RC close() { return -1; };
+  RC getNextTuple(RID &rid, void *data);
+  //RC close() { return -1; };
+  RC close();
 };
 
 
@@ -216,6 +233,7 @@ public:
   RC readAttribute(const string tableName, const RID &rid, const string attributeName, void *data);
 
   RC reorganizePage(const string tableName, const unsigned pageNumber);
+  void reorganizePage(uint8_t *raw_page, const RID &rid, PF_FileHandle handle);
 
   // scan returns an iterator to allow the caller to go through the results one by one.
   RC scan(const string tableName, 
@@ -271,10 +289,17 @@ public:
   RC closeAllTables();
 
   /* dump the page information given a pointer to the data page. */
-  void debug_data_page(uint8_t *raw_page, const char *annotation);
+  static void debug_data_page(uint8_t *raw_page, const char *annotation);
 
   /* dump the page information given a the page id. */
   RC debug_data_page(const string tableName, unsigned int page_id, const char *annotation);
+
+  /* auxillary functions for insertTuple and readTuple. */
+  static void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
+  static void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
+  static void record_attr_to_tuple(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position);
+
+  bool debug;
 
 private:
 
@@ -283,11 +308,6 @@ private:
 
   /* allocate & append a blank page to a given database file. */
   RC AllocateDataPage(PF_FileHandle &fileHandle);
-
-  /* auxillary functions for insertTuple and readTuple. */
-  void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
-  void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
-  void record_attr_to_tuple(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position);
 
   /* activateSlot returns the number of new slots created to activate a given slot in the directory. [max slots created is 1] */
   uint16_t activateSlot(uint16_t *slot_page, uint16_t slot_id, uint16_t record_offset);
