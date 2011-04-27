@@ -868,7 +868,22 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     }
     else
     {
-        /* XXX: need to compact, and then insert. */
+        /* auxillary record id. */
+        RID aux;
+
+        /* have enough usable space, but first need to compact and then insert. */
+        if(reorganizePage(tableName, page_id))
+            return -1;
+
+        /* all variables have been invalidate, instead call insertTuple, it should deterministically choose the same page. */
+        if(insertTuple(tableName, data, aux))
+            return -1;
+
+        /* this should always come to the same page. */
+        assert(rid.pageNum == aux.pageNum);
+
+        /* we're done, lets just return. */
+        return 0;
     }
 
     /* write page back. */
