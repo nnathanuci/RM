@@ -825,6 +825,9 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if(handle.ReadPage(page_id, raw_page))
         return -1;
 
+    cout << "available space on page: " << avail_space << endl;
+    debug_data_page(raw_page, "after insertTuple");
+
     /* get the free space offset, and determine available space. */
     free_space_avail = SLOT_GET_FREE_SPACE(slot_page);
     free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
@@ -844,9 +847,12 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
         /* calculate new offset, which is the offset after the record is appended at the free space offset. */
         new_offset = free_space_offset + record_length;
 
-        /* align it to even boundary (ignore the one-byte fragment). */
+        /* align it to even boundary (and write a fragment byte on the boundary). */
         if(IS_ODD(new_offset))
+        {
+            memset(raw_page + new_offset, SLOT_FRAGMENT_BYTE, 1);
             new_offset++;
+        }
 
         /* update free space offset (aligned to an even boundary). */
         slot_page[SLOT_FREE_SPACE_INDEX] = new_offset;
@@ -869,11 +875,16 @@ RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
     if(handle.WritePage(page_id, (void *) raw_page))
         return -1;
 
-    /* update space in the control page. */
+    /* update space in the control page, align the record length on even boundary */
+    if(IS_ODD(record_length))
+        record_length++;
+
     if(decreasePageSpace(handle, page_id, record_length + new_slot_flag*sizeof(uint16_t)))
         return -1;
 
-    debug_data_page(raw_page, "insertTuple");
+    getPageSpace(handle, page_id, avail_space);
+    cout << "available space on page: " << avail_space << endl;
+    debug_data_page(raw_page, "after insertTuple");
 
     return 0;
 } // }}}
@@ -982,7 +993,7 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
 
     uint16_t avail_space;
     getPageSpace(handle, rid.pageNum, avail_space);
-    cout << "available space on page: " << avail_space;
+    cout << "available space on page: " << avail_space << endl;
     debug_data_page(raw_page, "before delete");
 
     /* two cases: record to delete is last page that appears on record preceding free space, or earlier which leaves a fragment. */
@@ -1011,7 +1022,7 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
         return -1;
 
     getPageSpace(handle, rid.pageNum, avail_space);
-    cout << "available space on page: " << avail_space;
+    cout << "available space on page: " << avail_space << endl;
     debug_data_page(raw_page, "after delete");
 
     return 0;
@@ -1359,7 +1370,7 @@ RC RM::deleteTuples(const string tableName) // {{{
     return 0;
 } // }}}
 
-RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
+RC RM::reorganizePage(const string tableName, const unsigned pageNumber) // {{{
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -1564,12 +1575,9 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
         return -1;
 
     return 0;
-}
+} // }}}
 
-// functions undefined {{{
-
-
-RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data)
+RC RM::readAttribute(const string tableName, const RID &rid, const string attributeName, void *data) // {{{
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -1611,14 +1619,18 @@ RC RM::readAttribute(const string tableName, const RID &rid, const string attrib
 
     /* we're done, wasn't that hard? */
     return 0;
-}
+} // }}}
 
-// scan returns an iterator to allow the caller to go through the results one by one.
+// scan returns an iterator to allow the caller to go through the results one by one. // {{{
 RC RM::scan(const string tableName, 
       const vector<string> &attributeNames, // a list of projected attributes
-      RM_ScanIterator &rm_ScanIterator) { return -1; }
+      RM_ScanIterator &rm_ScanIterator)
+{
+    return -1;
+}
+// }}}
 
-RC RM::debug_data_page(const string tableName, unsigned int page_id, const char *annotation)
+RC RM::debug_data_page(const string tableName, unsigned int page_id, const char *annotation) // {{{
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -1638,6 +1650,5 @@ RC RM::debug_data_page(const string tableName, unsigned int page_id, const char 
     debug_data_page(raw_page, annotation);
 
     return 0;
-}
+} // }}}
 
-// }}}
