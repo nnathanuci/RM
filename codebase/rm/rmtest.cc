@@ -1696,18 +1696,144 @@ void rmTest_TupleMgmt(RM *rm) // {{{
 
 } // }}}
 
+void rmTest_Scan(RM *rm) // {{{
+{
+    RID scan;
+
+    /* used when getting free pages. */
+    unsigned int page_id, n_pages;
+    uint16_t unused_space, aux_space;
+    uint16_t request;
+
+    /* create a scratch control page for comparison purposes only */
+    uint16_t scratch_ctrl_page[CTRL_MAX_PAGES];
+
+    /* buffer to read in page. */
+    char read_page_buf[PF_PAGE_SIZE];
+
+    /* void pointer for passing to functions. */
+    void *read_page = read_page_buf;
+
+    /* place to store data. */
+    int data_size;
+    char data[PF_PAGE_SIZE];
+    char data_read[PF_PAGE_SIZE];
+
+
+    /* auxillary record id used for scanning */
+    RID aux;
+
+    /* clear the data/data_read to ensure the data matches. */
+    memset(data, 0xF8, PF_PAGE_SIZE);
+    memset(data_read, 0xF8, PF_PAGE_SIZE);
+
+    PF_FileHandle handle;
+
+    string t1 = "t1";
+    vector<Attribute> t1_attrs;
+    /* records can be of any size, make use of int. */
+    t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+    t1_attrs.push_back((struct Attribute) { "a2", TypeInt, 0 });
+    t1_attrs.push_back((struct Attribute) { "a3", TypeInt, 0 });
+    t1_attrs.push_back((struct Attribute) { "a4", TypeVarChar, 4000 });
+
+
+    cout << "\n[ insert 1000 records, cause a tuple redirection, scan the table. ]" << endl; // {{{
+    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+ 
+    for(int i = 0; i<1000; i++)
+    {
+        int n;
+
+        n=i;
+        memcpy(data, &n, sizeof(n));
+        n += 2000;
+        memcpy(data + sizeof(n), &n, sizeof(n));
+        n = 1000 - i;
+        memcpy(data+2*sizeof(n), &n, sizeof(n));
+        /* write 100 byte varchars */
+        n=100;
+        memcpy(data+3*sizeof(n), &n, sizeof(n));
+
+        ZERO_ASSERT(rm->insertTuple(t1, data, aux));
+        cout << "PASS: insertTuple(" << t1 << ": (" << i << "," << 2000+i << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
+    }
+
+    // Set up the iterator
+    int n_scanned = 0;
+    RM_ScanIterator rmsi;
+    scan.pageNum = scan.slotNum = 0;
+    string attr1 = "a1";
+    string attr2 = "a3";
+    vector<string> attributes;
+    attributes.push_back(attr1);
+    attributes.push_back(attr2);
+    ZERO_ASSERT(rm->scan(t1, attributes, rmsi));
+    cout << "PASS: ScanIterator setup." << endl;
+
+    cout << "Scanned Data:" << endl;
+
+    rm->debug = false;
+    while(rmsi.getNextTuple(scan, data_read) != RM_EOF)
+    {
+        n_scanned++;
+        cout << "a1: " << *(int *)data_read << " a2: " << *((int *)(data_read + sizeof(int))) << " [" << scan.pageNum << ", " << scan.slotNum << "]"  << endl;
+    }
+    rm->debug = false;
+    cout << "PASS: read " << n_scanned << " records" << endl;
+
+    /* cause i=998 to redirect. */
+    aux.pageNum = 32;
+    aux.slotNum = 6;
+
+    int n=998;
+    memcpy(data, &n, sizeof(n));
+    n += 2000;
+    memcpy(data + sizeof(n), &n, sizeof(n));
+    n = 1000 - 998;
+    memcpy(data+2*sizeof(n), &n, sizeof(n));
+    /* update record to use 3500 bytes, goes to a new page */
+    n=3500;
+    memcpy(data+3*sizeof(n), &n, sizeof(n));
+
+    ZERO_ASSERT(rm->updateTuple(t1, data, aux));
+    cout << "PASS: insertTuple(" << t1 << ": (" << 998 << "," << 2000+998 << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
+
+    ZERO_ASSERT(rm->scan(t1, attributes, rmsi));
+    cout << "PASS: ScanIterator setup." << endl;
+
+    cout << "Scanned Data:" << endl;
+
+    rm->debug = false;
+    n_scanned = 0;
+    while(rmsi.getNextTuple(scan, data_read) != RM_EOF)
+    {
+        n_scanned++;
+        cout << "a1: " << *(int *)data_read << " a2: " << *((int *)(data_read + sizeof(int))) << " [" << scan.pageNum << ", " << scan.slotNum << "]"  << endl;
+    }
+    rm->debug = false;
+
+    cout << "PASS: read " << n_scanned << " records [redirected i=998]" << endl;
+
+    // }}}
+
+    
+} // }}}
+
 void rmTest()
 {
     RM *rm = RM::Instance();
-
+    //rm->debug = 1;
     // delete all test files
     rmTest_CleanUp();
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    //rmTest_SystemCatalog(rm);
-    //rmTest_PageMgmt(rm);
-    rmTest_TupleMgmt(rm);
+    rmTest_SystemCatalog(rm);
+    rmTest_PageMgmt(rm);
+    //rmTest_TupleMgmt(rm);
+    rmTest_Scan(rm);
 }
 
 int main(int argc, char **argv)
