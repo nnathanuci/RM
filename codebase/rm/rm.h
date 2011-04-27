@@ -165,6 +165,25 @@ typedef enum { EQ_OP = 0,  // =
            NO_OP       // no condition
 } CompOp;
 
+#define VALUE_COMP_OP(op, lhs, rhs) \
+                                    do \
+                                    { \
+                                       if((op) == EQ_OP && (lhs) != (rhs)) \
+                                           return 1; \
+                                       else if((op) == LT_OP && ((lhs) >= (rhs))) \
+                                           return 1; \
+                                       else if((op) == GT_OP && ((lhs) <= (rhs))) \
+                                           return 1; \
+                                       else if((op) == LE_OP && ((lhs) > (rhs))) \
+                                           return 1; \
+                                       else if((op) == GE_OP && ((lhs) < (rhs))) \
+                                           return 1; \
+                                       else if((op) == NE_OP && ((lhs) == (rhs))) \
+                                           return 1; \
+                                    } \
+                                    while(0)
+
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 # define RM_EOF (-1)  // end of a scan operator
 
@@ -180,6 +199,7 @@ typedef enum { EQ_OP = 0,  // =
 class RM_ScanIterator {
 private:
   void record_attrs_to_tuple(uint8_t *record, void *data);
+  RC record_cond_attrs_to_tuple(uint8_t *record, void *data);
   RC updateNextPage();
 
 public:
@@ -197,12 +217,14 @@ public:
   unsigned int num_slots;
   CompOp op;
   void *value;
+  Attribute cond_attr;
+  uint16_t cond_attr_pos;
 
   PF_FileHandle handle;
 
   // "data" follows the same format as RM::insertTuple()
   RC getNextTuple(RID &rid, void *data);
-  RC getNextTupleComp(RID &rid, void *data);
+  RC getNextTupleCond(RID &rid, void *data);
   //RC close() { return -1; };
   RC close();
 };
@@ -217,6 +239,8 @@ public:
   RC createTable(const string tableName, const vector<Attribute> &attrs);
 
   RC deleteTable(const string tableName);
+
+  RC setAttributes(const string tableName, vector<Attribute> &attrs);
 
   RC getAttributes(const string tableName, vector<Attribute> &attrs);
 

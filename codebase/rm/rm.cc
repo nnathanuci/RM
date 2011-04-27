@@ -364,8 +364,6 @@ RC RM::openTable(const string tableName, PF_FileHandle &fileHandle) // {{{
         /* open file and retrieve handle. */
         if (pf->OpenFile(tableName.c_str(), handle))
             return -1;
-
-        /* XXX: scan the attributes */
     }
 
     /* cache handle for later use. */
@@ -468,6 +466,9 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
     /* create table. */
     catalog[tableName] = attrs;
 
+    /* populate the attributes in the system catalog table. */
+    //setAttributes(tableName, attrs);
+
     /* add fields for quick lookup (table.fieldname) */
     for (unsigned int i = 0; i < attrs.size(); i++)
     {
@@ -482,8 +483,20 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
     return 0;
 } // }}}
 
+RC RM::setAttributes(const string tableName, vector<Attribute> &attrs) // {{{
+{
+    // XXX: fetch attributes. 
+    /* table doesnt exists. */
+    if (!catalog.count(tableName))
+        return -1;
+
+    attrs = catalog[tableName];
+
+    return 0;
+}
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 {
+    // XXX: fetch attributes. 
     /* table doesnt exists. */
     if (!catalog.count(tableName))
         return -1;
@@ -2410,10 +2423,10 @@ RC RM::scan(const string tableName, const string conditionAttribute, const CompO
 
     /* conditional attribute stuff. */
     rm_ScanIterator.op = compOp;
-    rm_ScanIterator.value = value;
+    rm_ScanIterator.value = (void *) value;
 
     /* get the actual attribute. */
-    if (getAttribute(tableName, conditionalAttribute[i], cond_attr, cond_attr_pos))
+    if (getAttribute(tableName, conditionAttribute, cond_attr, cond_attr_pos))
         return -1;
 
     rm_ScanIterator.cond_attr = cond_attr;
@@ -2423,8 +2436,6 @@ RC RM::scan(const string tableName, const string conditionAttribute, const CompO
 }
 
 // }}}
-
-
 
 RC RM::debug_data_page(const string tableName, unsigned int page_id, const char *annotation) // {{{
 {
@@ -2482,7 +2493,57 @@ void RM_ScanIterator::record_attrs_to_tuple(uint8_t *record, void *data)
     }
 }
 
-RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data)
+RC RM_ScanIterator::record_cond_attrs_to_tuple(uint8_t *record, void *data) // {{{
+{
+    /* keep a pointer to where data needs to be packed. */
+    uint8_t *tuple_ptr = (uint8_t *) data;
+
+    /* determine if the condition is met. */
+    RM::record_attr_to_tuple(record, tuple_ptr, cond_attr, cond_attr_pos);
+
+    if (cond_attr.type == TypeInt)
+    {
+        int lhs_val, rhs_val;
+        memcpy(&lhs_val, tuple_ptr, sizeof(lhs_val));
+        memcpy(&rhs_val, value, sizeof(rhs_val));
+        VALUE_COMP_OP(op, lhs_val, rhs_val);
+    }
+    else if (cond_attr.type == TypeReal)
+    {
+        float lhs_val, rhs_val;
+        memcpy(&lhs_val, tuple_ptr, sizeof(lhs_val));
+        memcpy(&rhs_val, value, sizeof(rhs_val));
+        VALUE_COMP_OP(op, lhs_val, rhs_val);
+    }
+    else if (cond_attr.type == TypeVarChar)
+    {
+        int lhs_length, rhs_length, cmp_value;
+        memcpy(&lhs_length, tuple_ptr, sizeof(lhs_length));
+        memcpy(&rhs_length, value, sizeof(rhs_length));
+
+        /* if the lengths don't match and we're testing for equality we immediately know this isn't equal. */
+        if(op == EQ_OP && lhs_length != rhs_length)
+            return 1;
+
+        /* if the lengths are equal then just compare, otherwise they're not equal strings. */
+        if(lhs_length == rhs_length)
+        {
+            /* compare the buffers up to the shortest one. */
+            cmp_value = memcmp((uint8_t *) tuple_ptr, ((uint8_t *) value) + sizeof(rhs_length), MIN(lhs_length, rhs_length));
+
+            /* ensure equality or inequality. */
+            if((cmp_value == 0 && op == NE_OP) || (cmp_value != 0 && op == EQ_OP))
+                return 1;
+        }
+    }
+
+    /* get the data. */
+    record_attrs_to_tuple(record, data);
+ 
+    return 0;
+} // }}}
+
+RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -2518,7 +2579,20 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data)
 
         /* if all crtieria are met, then we can use this slot id to get a record. */
         if(slot_id < num_slots && SLOT_IS_ACTIVE(record_offset) && REC_IS_RECORD(raw_page + record_offset))
-            break;
+        {
+            /* get the record, make sure it meets criteria. */
+            if(!record_cond_attrs_to_tuple(raw_page + record_offset, data))
+            {
+                /* return the data. */
+                rid.pageNum = page_id;
+                rid.slotNum = slot_id;
+         
+                /* work on the next slot next time the iterator is called. */
+                slot_id++;
+
+                return 0;
+            }
+        }
 
         /* otherwise keep searching. */
         slot_id++;
@@ -2544,21 +2618,10 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data)
         }
     }
 
-    /* get the record. */
-    record_attrs_to_tuple(raw_page + record_offset, data);
-
-    /* return the data. */
-    rid.pageNum = page_id;
-    rid.slotNum = slot_id;
-
-    /* work on the next slot. */
-    slot_id++;
-
-    /* update next slot id. */
     return 0;
-}
+} // }}}
 
-RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
+RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
 {
     /* data variables for reading in pages. */
     uint8_t raw_page[PF_PAGE_SIZE];
@@ -2637,13 +2700,13 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data)
     }
 
     return 0;
-}
+} // }}}
 
-RC RM_ScanIterator::close()
+RC RM_ScanIterator::close() // {{{
 {
     page_id = 0;
     slot_id = 0;
     num_slots = 0;
 
     return 0;
-};
+}; // }}}
