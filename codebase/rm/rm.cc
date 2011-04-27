@@ -604,7 +604,7 @@ void RM::record_to_tuple(uint8_t *record, const void *tuple, const vector<Attrib
    }
 } // }}}
 
-void RM::record_to_attr(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position) // {{{
+void RM::record_attr_to_tuple(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position) // {{{
 {
    uint8_t *tuple_ptr = (uint8_t *) tuple;
    uint8_t *record_data_ptr;
@@ -1633,7 +1633,7 @@ RC RM::readAttribute(const string tableName, const RID &rid, const string attrib
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
 
     /* copy record to tuple buffer. */
-    record_to_attr(raw_page + record_offset, data, attr, attr_position);
+    record_attr_to_tuple(raw_page + record_offset, data, attr, attr_position);
 
     /* we're done, wasn't that hard? */
     return 0;
@@ -1644,6 +1644,40 @@ RC RM::scan(const string tableName,
       const vector<string> &attributeNames, // a list of projected attributes
       RM_ScanIterator &rm_ScanIterator)
 {
+     /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* number of pages: control/data */
+    uint16_t n_pages;
+    uint16_t n_control_pages;
+    uint16_t n_data_pages;
+
+    /* offset in page where the record begins. */
+    uint16_t record_offset;
+
+    /* attribute of fields to read. */
+    vector<Attribute> attrs;
+    vector<int> attr_pos;
+
+    /* attribute position. */
+    uint16_t attr_position;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* retrieve table attributes. */
+    if(getAttribute(tableName, attributeName, attr, attr_position))
+        return -1;
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(rid.pageNum, raw_page))
+        return -1;
+   
     return -1;
 }
 // }}}
