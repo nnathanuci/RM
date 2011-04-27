@@ -1,6 +1,3 @@
-
-@nnathan Page File Format-------------------------------------------------------
-
 Table data is stored stored in heap files.
 
 - Each page in the heap is 4096 bytes (4KB) in size.
@@ -9,51 +6,17 @@ Table data is stored stored in heap files.
   * a control page
   * a data page
 
-- The space needed to address a page is 12 bits. When convenient we use
-  2 bytes instead.
+- The space needed to address a page is 12 bits. When convenient we use 2 bytes instead.
 
 Control Pages:
 
 - A control page tells us the amount of unused space in a data page.
 
 - The format for a control page is as follows:
-  (unused_0, unused_1, unused_2, ..., unused_k, ..., next_control_pid)
+  (unused_0, unused_1, unused_2, ..., unused_n)
 
-  * next_control_pid is an unsigned 32-bit int, stored at offset 4092
-    in the page. It indicates the next control page, page id.
+  * since we're representing every unused space as 2 bytes, a control page can have 2048 entries.
 
-- For example, to find the amount of unused space for page 20.
-  Calculate the bit offset:            20*12 = 240.
-  Find the byte offset:                240 / 8 = 30
-  Find the remaining bit offset:       240 % 8 = 0
-  Find the amount of unused space:     unsigned short x = (page[30] << 4) | (page[31] >> 4)
+  * everytime we do an insert/update/deleteTuple, the correct control page needs to be updated.
 
---------------------------------------------------------------------------------
-@darkhipo questions:
-  
- Steps For Insert data_tuple into table "table":
-  
- Lookup catalog table info for "table", this gets you the attributes vector.
- 
- Produce a record of size r_b bytes using the attributes, and the data given.
- 
- Test whether r_b <= PAGE_SIZE if so error out otherwise continue. 
- 
- Identify page with sufficient space to accomodate all r_b bytes of the record.
- *Do this by reading in the control page, and sequentially reading the vector
- (free_0, free_1, free_2, ..., free_k, ..., next_control_pid) until a space 
- large enough is found. (say it is found at free_i)*
- 
- Identify the starting offset within data page i of a memory slot large enough 
- to accomodate r_b bytes call it i_fo. (How are we doing this ?) 
- 
- Read slot table at page i, add a new record id (rid) for the record into 
- the slot table. call it rid_r (How are we doing this ?)
- 
- Modify the slot table so that SLOT_TABLE[rid_r] = i_fo (or = i_fo + r_b ?)
- 
- Write the record on page i, on bytes [i_fo, i_fo + r_b].
- 
-
- ^^Question: Can you look through that and change what you think is wrong or 
- imprecise ?
+  * arithmetic in rm.h explains how to determine given an absolute page id, which corresponding control page and index manages it.
