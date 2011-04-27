@@ -912,6 +912,8 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
     /* get the beginning offset from the slot associated with the record. */
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
 
+    /* check if it's a record, otherwise follow redirect. */
+
     /* copy record to tuple buffer. */
     record_to_tuple(raw_page + record_offset, data, attrs);
 
@@ -978,6 +980,9 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
 
     cout << "GOING TO DELETE: " << record_length << " at slot: " << rid.slotNum << " with offset: " << record_offset << " to " << record_end_offset << endl;
 
+    uint16_t avail_space;
+    getPageSpace(handle, rid.pageNum, avail_space);
+    cout << "available space on page: " << avail_space;
     debug_data_page(raw_page, "before delete");
 
     /* two cases: record to delete is last page that appears on record preceding free space, or earlier which leaves a fragment. */
@@ -999,13 +1004,15 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     space_deleted = record_end_offset - record_offset;
     n_slots_deleted = deactivateSlot(slot_page, rid.slotNum);
 
-    debug_data_page(raw_page, "after delete");
-
     if(handle.WritePage(rid.pageNum, raw_page))
         return -1;
 
     if(increasePageSpace(handle, rid.pageNum, space_deleted + n_slots_deleted * sizeof(uint16_t)))
         return -1;
+
+    getPageSpace(handle, rid.pageNum, avail_space);
+    cout << "available space on page: " << avail_space;
+    debug_data_page(raw_page, "after delete");
 
     return 0;
 } // }}}
@@ -1358,19 +1365,17 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
     uint8_t raw_page[PF_PAGE_SIZE];
     uint16_t *slot_page = (uint16_t *) raw_page;
 
-    /* attributes to determine data packing format. */
-    vector<Attribute> attrs;
-
     /* handle for database. */
     PF_FileHandle handle;
 
     uint16_t begin_fragment_offset = SLOT_INVALID_ADDR; /* points to invalid address. */
     uint16_t offset_to_slot_map[SLOT_HASH_SIZE];
-    uint16_t free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
+    uint16_t free_space_offset;
 
-    /* retrieve table attributes. */
-    if(getAttributes(tableName, attrs))
-        return -1;
+    uint16_t avail_space;
+
+    /* new free space offset will point to where the free space begins after being compacted. */
+    uint16_t new_free_space_offset = 0;
 
     /* open table to read in page. */
     if(openTable(tableName, handle))
@@ -1379,7 +1384,10 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
     /* read in data page */
     if(handle.ReadPage(pageNumber, raw_page))
         return -1;
-
+ 
+    debug_data_page(raw_page, "before reorg");
+    /* get free space offset. */
+    free_space_offset = SLOT_GET_FREE_SPACE_OFFSET(slot_page);
 
     /* read in the slot directory, create a map. */
 
@@ -1424,6 +1432,7 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
                 /* determine if followed by record or tuple redirect. */
                 if(REC_IS_TUPLE_REDIR(raw_page + i))
                 {
+                        
                     uint16_t length = REC_TUPLE_REDIR_LENGTH;
                     uint16_t mark_length;
                     uint16_t redir_slot;
@@ -1431,37 +1440,45 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
                     /* move the data. */
                     memcpy(raw_page + begin_fragment_offset, raw_page + i, length);
 
-                    /* update slot information with fragment offset as that's where the data is now copied. */
+                    /* get slot to update new offset. */
                     redir_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
 
-                    /* invalidate old offset in hash. */
+                    /* invalidate old offset so that it no longer points to a slot. */
                     offset_to_slot_map[SLOT_HASH_FUNC(i)] = SLOT_FRAGMENT_WORD;
 
                     /* update slot table with the new offset. */
                     slot_page[SLOT_GET_SLOT_INDEX(redir_slot)] = begin_fragment_offset;
 
-                    /* update hash with the slot for the new offset. */
+                    /* update hash with new offset pointing to the slot. */
                     offset_to_slot_map[SLOT_HASH_FUNC(begin_fragment_offset)] = redir_slot;
 
                     /* update beginning fragment offset (skip the redirection data)  */
                     begin_fragment_offset += length;
 
+                    /* new free space points to end of compacted space. */
+                    new_free_space_offset = begin_fragment_offset;
+
                     /* mark residue data to continue identifying fragments, etc. */
                     if(fragment_size >= length)
                     {
-                        mark_length = fragment_size - length;
-                        memset(raw_page + i, SLOT_FRAGMENT_BYTE, mark_length);
+                        /* since residual bytes of fragment will already be marked as fragmented bytes, only update everything past the end of the fragment. */
+                        memset(raw_page + i, SLOT_FRAGMENT_BYTE, length);
                     }
                     else if(fragment_size < length)
                     {
+                        /* mark residual in old tuple data as fragment bytes. */
                         mark_length = (i + length) - begin_fragment_offset;
                         memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
                     }
+
+                    /* move past tuple redirect now that it's become fragmented space, compensate for post increment. */
+                    i += (length - 1);
                 }
                 else if(REC_IS_RECORD(raw_page + i))
                 {
                     uint16_t length = REC_LENGTH(raw_page + i);
                     uint16_t mark_length;
+                    uint16_t rec_slot;
 
                     /* align data. */
                     if(IS_ODD(length))
@@ -1470,21 +1487,48 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
                     /* move the data. */
                     memcpy(raw_page + begin_fragment_offset, raw_page + i, length);
 
+                    /* get slot to update new offset. */
+                    rec_slot = offset_to_slot_map[SLOT_HASH_FUNC(i)];
+
+                    /* invalidate old offset so that it no longer points to a slot. */
+                    offset_to_slot_map[SLOT_HASH_FUNC(i)] = SLOT_FRAGMENT_WORD;
+
+                    /* update slot table with the new offset. */
+                    slot_page[SLOT_GET_SLOT_INDEX(rec_slot)] = begin_fragment_offset;
+
+                    /* update hash with new offset pointing to the slot. */
+                    offset_to_slot_map[SLOT_HASH_FUNC(begin_fragment_offset)] = rec_slot;
+
                     /* update beginning offset */
                     begin_fragment_offset += length;
 
+                    /* new free space points to end of compacted space. */
+                    new_free_space_offset = begin_fragment_offset;
+
                     if(fragment_size >= length)
                     {
-                        mark_length = fragment_size - length;
+                        /* since residual bytes of fragment will already be marked as fragmented bytes, only update everything past the end of the fragment. */
+                        memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, length);
+                    }
+                    else if(fragment_size < length)
+                    {
+                        /* mark residual in old tuple data as fragment bytes. */
+                        mark_length = (i + length) - begin_fragment_offset;
                         memset(raw_page + begin_fragment_offset, SLOT_FRAGMENT_BYTE, mark_length);
+
                     }
 
+                    /* move past tuple redirect now that it's become fragmented space, compensate for post increment. */
+                    i += (length - 1);
                 }
             }
             else if(REC_IS_TUPLE_REDIR(raw_page + i))
             {
                 /* skip the redirect (compensate for post-increment). */
                 i += (REC_TUPLE_REDIR_LENGTH - 1);
+
+                /* new free space begins at end of tuple. */
+                new_free_space_offset += REC_TUPLE_REDIR_LENGTH;
 
                 /* reset the fragment pointer. */
                 begin_fragment_offset = SLOT_INVALID_ADDR;
@@ -1496,13 +1540,30 @@ RC RM::reorganizePage(const string tableName, const unsigned pageNumber)
                 /* skip to end of record aligned on even byte, minus one for the post increment. */
                 i += IS_EVEN(REC_LENGTH(raw_page + i)) ? REC_LENGTH(raw_page + i) - 1 : REC_LENGTH(raw_page + i);
 
+                new_free_space_offset = REC_LENGTH(raw_page + i);
+
+                /* new free space begins at end of record. */
+                if(IS_ODD(REC_LENGTH(raw_page + i)))
+                    new_free_space_offset += REC_LENGTH(raw_page + i);
+
                 /* reset the fragment pointer. */
                 begin_fragment_offset = SLOT_INVALID_ADDR;
             }
         }
     }
 
-    return -1;
+    slot_page[SLOT_FREE_SPACE_INDEX] = new_free_space_offset;
+
+    debug_data_page(raw_page, "after reorg");
+    getPageSpace(handle, pageNumber, avail_space);
+    cout << "available space: " << avail_space << endl;
+    assert(SLOT_GET_FREE_SPACE(slot_page) == avail_space);
+     
+    /* write back page. */
+    if(handle.WritePage(pageNumber, raw_page))
+        return -1;
+
+    return 0;
 }
 
 // functions undefined {{{
@@ -1557,6 +1618,26 @@ RC RM::scan(const string tableName,
       const vector<string> &attributeNames, // a list of projected attributes
       RM_ScanIterator &rm_ScanIterator) { return -1; }
 
-void RM::debug_data_page(unsigned int page_id) { return; }
+RC RM::debug_data_page(const string tableName, unsigned int page_id, const char *annotation)
+{
+    /* data variables for reading in pages. */
+    uint8_t raw_page[PF_PAGE_SIZE];
+    uint16_t *slot_page = (uint16_t *) raw_page;
+
+    /* handle for database. */
+    PF_FileHandle handle;
+
+    /* open table to read in page. */
+    if(openTable(tableName, handle))
+        return -1;
+
+    /* read in data page */
+    if(handle.ReadPage(page_id, raw_page))
+        return -1;
+
+    debug_data_page(raw_page, annotation);
+
+    return 0;
+}
 
 // }}}
