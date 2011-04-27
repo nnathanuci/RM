@@ -958,12 +958,12 @@ RC RM::readTuple(const string tableName, const RID &rid, void *data) // {{{
         /* read in from the redirected tuple. */
         if(readTuple(tableName, aux, data))
             return -1;
+
+        return 0;
     }
-    else
-    {
-        /* copy record to tuple buffer. */
-        record_to_tuple(raw_page + record_offset, data, attrs);
-    }
+
+    /* copy record to tuple buffer. */
+    record_to_tuple(raw_page + record_offset, data, attrs);
 
     /* we're done, wasn't that hard? */
     return 0;
@@ -1016,10 +1016,47 @@ RC RM::deleteTuple(const string tableName, const RID &rid) // {{{
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
 
-    /* XXX: check if tuple is redirect. */
-
     /* get the beginning offset from the slot associated with the record. */
     record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);  
+
+    /* check if record redirects. */
+    if(REC_IS_TUPLE_REDIR(raw_page + record_offset))
+    {
+        /* auxillary record id which is retrieved from the tuple redirection. */
+        RID aux;
+
+        /* point to the tuple redirection in the page. */
+
+        /* get the slot id, and discard the tuple marker. */
+        aux.slotNum = *((uint16_t *) (raw_page + record_offset)) - REC_TUPLE_MARKER;
+        aux.pageNum = *((unsigned int *) (raw_page + record_offset + sizeof(uint16_t)));
+
+        /* delete the redirected tuple. */
+        if(deleteTuple(tableName, aux))
+            return -1;
+
+        /* check to see if record ends on free space offset, otherwise write fragment. */
+        if(record_offset + REC_TUPLE_REDIR_LENGTH == free_space_offset)
+            slot_page[SLOT_FREE_SPACE_INDEX] = free_space_offset - REC_TUPLE_REDIR_LENGTH;
+        else
+            memset(raw_page + record_offset, SLOT_FRAGMENT_BYTE, REC_TUPLE_REDIR_LENGTH);
+
+        n_slots_deleted = deactivateSlot(slot_page, rid.slotNum);
+
+        if(increasePageSpace(handle, rid.pageNum, REC_TUPLE_REDIR_LENGTH + n_slots_deleted * sizeof(uint16_t)))
+            return -1;
+
+        {
+            uint16_t avail_space;
+            getPageSpace(handle, rid.pageNum, avail_space);
+            debug_data_page(raw_page, "after delete");
+            cout << "available space on page: " << avail_space << endl;
+        }
+
+        return 0;
+    }
+
+    /* tuple is a record, get the length. */
     record_length = REC_LENGTH(raw_page + record_offset);
 
     /* determine ending offset of record. */
@@ -1134,7 +1171,6 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
     if(SLOT_IS_INACTIVE(SLOT_GET_SLOT(slot_page, rid.slotNum)))
         return -1;
 
-    /* XXX: check if tuple is a redirect. */
 
     /* get the beginning offset of free space. */
     free_space_offset = slot_page[SLOT_FREE_SPACE_INDEX];
@@ -1144,13 +1180,6 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
 
     /* get the beginning offset from the slot associated with the record. */
     old_record_offset = SLOT_GET_SLOT(slot_page, rid.slotNum);
-    old_record_length = REC_LENGTH(raw_page + old_record_offset);
-
-    /* find even aligned ending offset for the old record. */
-    old_record_end_offset_even = old_record_offset + old_record_length;
-    if(IS_ODD(old_record_end_offset_even))
-        old_record_end_offset_even++;
-
     {
         stringstream ss;
         ss << "before update: slot: " << rid.slotNum << " newlength: " << update_record_length << " ]";
@@ -1160,6 +1189,32 @@ RC RM::updateTuple(const string tableName, const void *data, const RID &rid) // 
         cout << "available space on page: " << new_space << endl;
     }
 
+    /* check if record redirects. */
+    if(REC_IS_TUPLE_REDIR(raw_page + old_record_offset))
+    {
+        /* auxillary record id which is retrieved from the tuple redirection. */
+        RID aux;
+
+        /* point to the tuple redirection in the page. */
+
+        /* get the slot id, and discard the tuple marker. */
+        aux.slotNum = *((uint16_t *) (raw_page + old_record_offset)) - REC_TUPLE_MARKER;
+        aux.pageNum = *((unsigned int *) (raw_page + old_record_offset + sizeof(uint16_t)));
+
+        /* update the redirected tuple. */
+        if(updateTuple(tableName, data, aux))
+            return -1;
+
+        return 0;
+    }
+
+    /* it's a record, so we can get the length. */
+    old_record_length = REC_LENGTH(raw_page + old_record_offset);
+
+    /* find even aligned ending offset for the old record. */
+    old_record_end_offset_even = old_record_offset + old_record_length;
+    if(IS_ODD(old_record_end_offset_even))
+        old_record_end_offset_even++;
 
 
     /* don't have time to fix this, but this function can really be compressed by distinguishing between growing at the free offset and not. */
