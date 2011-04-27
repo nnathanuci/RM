@@ -1026,74 +1026,391 @@ void rmTest_TableMgmt(RM *rm) // {{{
     string t1 = "t1";
     vector<Attribute> t1_attrs;
     /* 512 byte max records. */
-    t1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 508 });
+    t1_attrs.push_back((struct Attribute) { "a1", TypeVarChar, 4000 });
 
-     
-     cout << "\n[ insert and read a record. ]" << endl; // {{{
-     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
-     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
-     
-     /* create a record. */
-     data_size = 1;
-     memcpy(data, &data_size, sizeof(data_size));
-     memcpy(data+sizeof(data_size), &("T"), 1);
-     ZERO_ASSERT(rm->insertTuple(t1, data, r1));
-     cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
-    
-     /* read back record. */
-     ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
-     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
-     cout << "rm->readTuple(" << t1 << ", r1)" << endl;
- 
-     /* wipe out the table. */
-     ZERO_ASSERT(rm->deleteTable(t1));
-     cout << "PASS: deleteTable(" << t1 << ")" << endl;
-     // }}} 
- 
-     cout << "\n[ insert 2 records and delete the last record. ]" << endl; // {{{
-     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
-     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
-     
-     /* create a record. */
-     data_size = 1;
-     memcpy(data, &data_size, sizeof(data_size));
-     memcpy(data+sizeof(data_size), &("T"), 1);
-     ZERO_ASSERT(rm->insertTuple(t1, data, r1));
-     cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
-    
-     /* read back record. */
-     ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
-     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
-     cout << "rm->readTuple(" << t1 << ", r1)" << endl;
- 
-     /* create second record. */
-     data_size = 1;
-     memcpy(data, &data_size, sizeof(data_size));
-     memcpy(data+sizeof(data_size), &("T"), 1);
-     ZERO_ASSERT(rm->insertTuple(t1, data, r2));
-     cout << "rm->insertTuple(" << t1 << ", r2)" << endl;
-    
-     /* read back record. */
-     ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
-     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
-     cout << "rm->readTuple(" << t1 << ", r2)" << endl;
- 
-     /* delete last record. */
-     ZERO_ASSERT(rm->deleteTuple(t1, r2));
- 
-     /* wipe out the table. */
-     ZERO_ASSERT(rm->deleteTable(t1));
-     cout << "PASS: deleteTable(" << t1 << ")" << endl;
-     // }}} 
- 
-    cout << "\n[ insert 2 records and delete the first record. ]" << endl; // {{{
+//     
+//     cout << "\n[ insert and read a record. ]" << endl; // {{{
+//     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//     
+//     /* create a record. */
+//     data_size = 1;
+//     memcpy(data, &data_size, sizeof(data_size));
+//     memcpy(data+sizeof(data_size), &("T"), 1);
+//     ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//     cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
+//    
+//     /* read back record. */
+//     ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//     cout << "rm->readTuple(" << t1 << ", r1)" << endl;
+// 
+//     /* wipe out the table. */
+//     ZERO_ASSERT(rm->deleteTable(t1));
+//     cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//     // }}} 
+// 
+//     cout << "\n[ insert 2 records and delete the last record. ]" << endl; // {{{
+//     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//     
+//     /* create a record. */
+//     data_size = 1;
+//     memcpy(data, &data_size, sizeof(data_size));
+//     memcpy(data+sizeof(data_size), &("T"), 1);
+//     ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//     cout << "rm->insertTuple(" << t1 << ", r1)" << endl;
+//    
+//     /* read back record. */
+//     ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//     cout << "rm->readTuple(" << t1 << ", r1)" << endl;
+// 
+//     /* create second record. */
+//     data_size = 1;
+//     memcpy(data, &data_size, sizeof(data_size));
+//     memcpy(data+sizeof(data_size), &("T"), 1);
+//     ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//     cout << "rm->insertTuple(" << t1 << ", r2)" << endl;
+//    
+//     /* read back record. */
+//     ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//     cout << "rm->readTuple(" << t1 << ", r2)" << endl;
+// 
+//     /* delete last record. */
+//     ZERO_ASSERT(rm->deleteTuple(t1, r2));
+//    cout << "PASS: deleteTuple(" << t1 << ", page_id: " << r2.pageNum << ", slot_id: " << r2.slotNum << endl;
+// 
+//     /* wipe out the table. */
+//     ZERO_ASSERT(rm->deleteTable(t1));
+//     cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//     // }}} 
+// 
+//    cout << "\n[ insert 2 records and delete the first record. ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record. */
+//    data_size = 1;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("T"), 1);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 1;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("T"), 1);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* delete first record. */
+//    ZERO_ASSERT(rm->deleteTuple(t1, r1));
+//    cout << "PASS: deleteTuple(" << t1 << ", page_id: " << r1.pageNum << ", slot_id: " << r1.slotNum << endl;
+//
+//    /* reorganize page. */
+//    ZERO_ASSERT(rm->reorganizePage(t1, r1.pageNum));
+//    cout << "PASS: reorganizePage(" << r1.pageNum << ")" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//    cout << "\n[ insert 2 records and shrink the first record. ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* shrink first record. */
+//    data_size = 1;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("T"), 1);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+//    cout << "PASS: updateTuple(" << t1 << ") [shrink first record by 2 bytes]" << endl;
+//
+//    /* reorganize page. */
+//    ZERO_ASSERT(rm->reorganizePage(t1, r1.pageNum));
+//    cout << "PASS: reorganizePage(" << r1.pageNum << ")" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//    cout << "\n[ insert 2 records and grow the last record in free space (+1 byte). ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* grow last record. */
+//    data_size = 4;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTTT"), 4);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r2));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow last record by 1 byte]" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//    cout << "\n[ insert 2 records and grow the last record in free space (+2 byte). ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* grow last record. */
+//    data_size = 5;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTTTT"), 5);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r2));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow last record by 2 byte]" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//    cout << "\n[ insert 2 records and shrink, leave fragment, then grow first record in fragment. ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record. */
+//    data_size = 6;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTTTTT"), 6);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 6;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTTTTT"), 6);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* shrink first record. */
+//    data_size = 1;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("T"), 1);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+//    cout << "PASS: updateTuple(" << t1 << ") [shrink first record to 5 byte, leave fragment]" << endl;
+//
+//    /* grow first record. */
+//    data_size = 3;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTT"), 3);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow first record to 7 bytes, leaving fragment]" << endl;
+//
+//    /* grow first record. */
+//    data_size = 6;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    memcpy(data+sizeof(data_size), &("TTTTTT"), 6);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow first record back to 10 bytes, leaving no fragment]" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//
+//    cout << "\n[ insert 2 records filling up most of the space, grow last record, fail, let it redirect. ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record of 2048 bytes. */
+//    data_size = 2048;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 1024;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* grow last record to 2048 bytes, will need to redirect. */
+//    data_size = 2048;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r2));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow last record to 2048 bytes]" << endl;
+//
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2) [should be redirected]" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+//
+//    cout << "\n[ insert 2 records filling up most of the space, delete first, grow last, it should compact and fit. ]" << endl; // {{{
+//    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
+//    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+//    
+//    /* create a record of 2048 bytes. */
+//    data_size = 2048;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r1));
+//    cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+//
+//    /* create second record. */
+//    data_size = 1024;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->insertTuple(t1, data, r2));
+//    cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
+//   
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
+//
+//    /* delete first record. */
+//    ZERO_ASSERT(rm->deleteTuple(t1, r1));
+//    cout << "PASS: deleteTuple(" << t1 << ", page_id: " << r1.pageNum << ", slot_id: " << r1.slotNum << endl;
+//
+//    /* grow last record to 2048 bytes, it should automatically compact. */
+//    data_size = 2048;
+//    memcpy(data, &data_size, sizeof(data_size));
+//    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+//    ZERO_ASSERT(rm->updateTuple(t1, data, r2));
+//    cout << "PASS: updateTuple(" << t1 << ") [grow last record to 2048 bytes]" << endl;
+//
+//    /* read back record. */
+//    ZERO_ASSERT(rm->readTuple(t1, r2, data_read));   
+//    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+//    cout << "PASS: readTuple(" << t1 << ", r2) [should be redirected]" << endl;
+//
+//    /* wipe out the table. */
+//    ZERO_ASSERT(rm->deleteTable(t1));
+//    cout << "PASS: deleteTable(" << t1 << ")" << endl;
+//    // }}} 
+//
+
+    cout << "\n[ insert 2 records filling up most of the space, shrink first, grow beyond new fragment, it should relocate to free space. ]" << endl; // {{{
     ZERO_ASSERT(rm->createTable(t1, t1_attrs));
     cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
     
-    /* create a record. */
-    data_size = 1;
+    /* create a record of 500 bytes. */
+    data_size = 500;
     memcpy(data, &data_size, sizeof(data_size));
-    memcpy(data+sizeof(data_size), &("T"), 1);
+    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
     ZERO_ASSERT(rm->insertTuple(t1, data, r1));
     cout << "PASS: insertTuple(" << t1 << ", r1)" << endl;
    
@@ -1103,9 +1420,9 @@ void rmTest_TableMgmt(RM *rm) // {{{
     cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
 
     /* create second record. */
-    data_size = 1;
+    data_size = 500;
     memcpy(data, &data_size, sizeof(data_size));
-    memcpy(data+sizeof(data_size), &("T"), 1);
+    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
     ZERO_ASSERT(rm->insertTuple(t1, data, r2));
     cout << "PASS: insertTuple(" << t1 << ", r2)" << endl;
    
@@ -1114,12 +1431,30 @@ void rmTest_TableMgmt(RM *rm) // {{{
     ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
     cout << "PASS: readTuple(" << t1 << ", r2)" << endl;
 
-    /* delete first record. */
-    ZERO_ASSERT(rm->deleteTuple(t1, r1));
+    /* shrink first record to 100 */
+    data_size = 100;
+    memcpy(data, &data_size, sizeof(data_size));
+    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+    cout << "PASS: updateTuple(" << t1 << ") [shrink first record to 100 bytes]" << endl;
 
-    /* reorganize page. */
-    ZERO_ASSERT(rm->reorganizePage(t1, r1.pageNum));
-    cout << "PASS: reorganizePage(" << r1.pageNum << ")" << endl;
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+
+    /* grow first record to 600 */
+    data_size = 600;
+    memcpy(data, &data_size, sizeof(data_size));
+    for(int i = sizeof(int); i < data_size+sizeof(int); i++) data[i] = i - sizeof(int);
+    ZERO_ASSERT(rm->updateTuple(t1, data, r1));
+    cout << "PASS: updateTuple(" << t1 << ") [grow first record to 600 bytes, redirecting it to free space offset]" << endl;
+
+    /* read back record. */
+    ZERO_ASSERT(rm->readTuple(t1, r1, data_read));   
+    ZERO_ASSERT(memcmp(data, data_read, PF_PAGE_SIZE));
+    cout << "PASS: readTuple(" << t1 << ", r1)" << endl;
+
 
     /* wipe out the table. */
     ZERO_ASSERT(rm->deleteTable(t1));
