@@ -191,6 +191,7 @@ void secA_2(const string tablename, const int name_length, const string name, co
     assert(rc == success);
 
     // Test Delete Tuple
+    rid.slotNum = 0; // temporarily testing delete
     rc = rm->deleteTuple(tablename, rid);
     assert(rc == success);
 
@@ -452,9 +453,13 @@ void secA_7(const string tablename)
     }
     cout << "After Insertion!" << endl;
     
-    int pageid = 0; // Depends on which page the records are
+    int pageid = 1; // Depends on which page the records are
+    rm->debug_data_page(tablename, pageid, "before reorganize");
+
     rc = rm->reorganizePage(tablename, pageid);
     assert(rc == success);
+
+    rm->debug_data_page(tablename, pageid, "after reorganize");
 
     // Print out the tuples one by one
     int i = 0;
