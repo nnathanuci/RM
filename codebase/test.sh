@@ -1,11 +1,13 @@
-#!/bin/bash
+#!/bin/sh
+
+set -vx
 unzip $1.zip
 cd $1
 cd codebase
 cd pf
-make clean
-make
+gmake clean
+gmake
 cd ../rm
-make clean
-make
+gmake clean
+gmake
 ./rmtest
