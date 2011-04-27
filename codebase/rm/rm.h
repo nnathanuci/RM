@@ -122,6 +122,11 @@ using namespace std;
 #define SLOT_HASH_SIZE (PF_PAGE_SIZE/2)
 #define SLOT_HASH_FUNC(key) ((key)/2)
 
+
+/* for system catalogue */
+#define MAX_CAT_NAME_LEN 256
+#define SYSTEM_CAT_TABLENAME ("systemcatalog")
+
 // Return code
 typedef int RC;
 
@@ -190,11 +195,14 @@ public:
   unsigned int page_id;
   unsigned int slot_id;
   unsigned int num_slots;
+  CompOp op;
+  void *value;
 
   PF_FileHandle handle;
 
   // "data" follows the same format as RM::insertTuple()
   RC getNextTuple(RID &rid, void *data);
+  RC getNextTupleComp(RID &rid, void *data);
   //RC close() { return -1; };
   RC close();
 };
@@ -323,6 +331,12 @@ private:
 
   /* once a table is open, the file should persist. */
   map<string, PF_FileHandle> open_tables;
+
+  /* system catalogue attributes. */
+  vector<Attribute> system_catalog_attrs;
+
+  /* system catalogue tablename. */
+  string system_catalog_tablename;
 };
 
 #endif
