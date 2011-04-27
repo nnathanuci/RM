@@ -99,17 +99,17 @@ using namespace std;
 #define SLOT_INVALID_ADDR (0x0FFF)
 
 /* these function macros will index into the slot page, but can use the direct address equivalents above. */
-#define SLOT_GET_NUM_SLOTS(start) ((start)[SLOT_NUM_SLOT_INDEX])
-#define SLOT_GET_FREE_SPACE_OFFSET(start) ((start)[SLOT_FREE_SPACE_INDEX])
-#define SLOT_GET_SLOT(start, i) ((start)[SLOT_GET_SLOT_INDEX((i))])
-#define SLOT_GET_INACTIVE_SLOT(start, i) (((start)[SLOT_GET_SLOT_INDEX((i))] == SLOT_QUEUE_END) ? SLOT_QUEUE_END :  (start)[SLOT_GET_SLOT_INDEX((i))] - PF_PAGE_SIZE)
+#define SLOT_GET_NUM_SLOTS(start) (((uint16_t *) start)[SLOT_NUM_SLOT_INDEX])
+#define SLOT_GET_FREE_SPACE_OFFSET(start) (((uint16_t *) start)[SLOT_FREE_SPACE_INDEX])
+#define SLOT_GET_SLOT(start, i) (((uint16_t *) start)[SLOT_GET_SLOT_INDEX((i))])
+#define SLOT_GET_INACTIVE_SLOT(start, i) ((((uint16_t *) start)[SLOT_GET_SLOT_INDEX((i))] == SLOT_QUEUE_END) ? SLOT_QUEUE_END :  (start)[SLOT_GET_SLOT_INDEX((i))] - PF_PAGE_SIZE)
 
-#define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS((start)) - 1))
+#define SLOT_GET_LAST_SLOT_INDEX(start) (SLOT_GET_SLOT_INDEX(SLOT_GET_NUM_SLOTS(((uint16_t *) start)) - 1))
 
 /* calculate free space by subtracting the beginning of the last slot with the free space offset.
    (multiply by 2 since the slot index is for an array of uint16_t instead of uint8_t).
 */
-#define SLOT_GET_FREE_SPACE(start) ((sizeof(uint16_t)*SLOT_GET_LAST_SLOT_INDEX(start)) - SLOT_GET_FREE_SPACE_OFFSET(start))
+#define SLOT_GET_FREE_SPACE(start) ((sizeof(uint16_t)*SLOT_GET_LAST_SLOT_INDEX((uint16_t *) start)) - SLOT_GET_FREE_SPACE_OFFSET((uint16_t *) start))
 
 /* SLOT_MAX_SPACE is essentially the beginning of the slot directory in an
    unused data page. Therefore an active slot has an address before this. */
