@@ -1729,18 +1729,18 @@ void rmTest_Scan(RM *rm) // {{{
 
     PF_FileHandle handle;
 
-    string t1 = "t1";
-    vector<Attribute> t1_attrs;
+    string t1_scan = "t1_scan";
+    vector<Attribute> t1_scan_attrs;
     /* records can be of any size, make use of int. */
-    t1_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
-    t1_attrs.push_back((struct Attribute) { "a2", TypeInt, 0 });
-    t1_attrs.push_back((struct Attribute) { "a3", TypeInt, 0 });
-    t1_attrs.push_back((struct Attribute) { "a4", TypeVarChar, 4000 });
+    t1_scan_attrs.push_back((struct Attribute) { "a1", TypeInt, 0 });
+    t1_scan_attrs.push_back((struct Attribute) { "a2", TypeInt, 0 });
+    t1_scan_attrs.push_back((struct Attribute) { "a3", TypeInt, 0 });
+    t1_scan_attrs.push_back((struct Attribute) { "a4", TypeVarChar, 4000 });
 
 
     cout << "\n[ insert 1000 records, cause a tuple redirection, scan the table. ]" << endl; // {{{
-    ZERO_ASSERT(rm->createTable(t1, t1_attrs));
-    cout << "PASS: createTable(" << output_schema(t1, t1_attrs) << ")" << endl;
+    ZERO_ASSERT(rm->createTable(t1_scan, t1_scan_attrs));
+    cout << "PASS: createTable(" << output_schema(t1_scan, t1_scan_attrs) << ")" << endl;
  
     for(int i = 0; i<1000; i++)
     {
@@ -1756,8 +1756,8 @@ void rmTest_Scan(RM *rm) // {{{
         n=100;
         memcpy(data+3*sizeof(n), &n, sizeof(n));
 
-        ZERO_ASSERT(rm->insertTuple(t1, data, aux));
-        cout << "PASS: insertTuple(" << t1 << ": (" << i << "," << 2000+i << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
+        ZERO_ASSERT(rm->insertTuple(t1_scan, data, aux));
+        cout << "PASS: insertTuple(" << t1_scan << ": (" << i << "," << 2000+i << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
     }
 
     // Set up the iterator
@@ -1769,7 +1769,7 @@ void rmTest_Scan(RM *rm) // {{{
     vector<string> attributes;
     attributes.push_back(attr1);
     attributes.push_back(attr2);
-    ZERO_ASSERT(rm->scan(t1, attributes, rmsi));
+    ZERO_ASSERT(rm->scan(t1_scan, attributes, rmsi));
     cout << "PASS: ScanIterator setup." << endl;
 
     cout << "Scanned Data:" << endl;
@@ -1797,10 +1797,10 @@ void rmTest_Scan(RM *rm) // {{{
     n=3500;
     memcpy(data+3*sizeof(n), &n, sizeof(n));
 
-    ZERO_ASSERT(rm->updateTuple(t1, data, aux));
-    cout << "PASS: insertTuple(" << t1 << ": (" << 998 << "," << 2000+998 << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
+    ZERO_ASSERT(rm->updateTuple(t1_scan, data, aux));
+    cout << "PASS: insertTuple(" << t1_scan << ": (" << 998 << "," << 2000+998 << "," << 100 << "), aux) [page_id: " << aux.pageNum << ", slot_id: " << aux.slotNum << endl;
 
-    ZERO_ASSERT(rm->scan(t1, attributes, rmsi));
+    ZERO_ASSERT(rm->scan(t1_scan, attributes, rmsi));
     cout << "PASS: ScanIterator setup." << endl;
 
     cout << "Scanned Data:" << endl;
@@ -1815,6 +1815,10 @@ void rmTest_Scan(RM *rm) // {{{
     rm->debug = false;
 
     cout << "PASS: read " << n_scanned << " records [redirected i=998]" << endl;
+
+    /* wipe out the table. */
+    ZERO_ASSERT(rm->deleteTable(t1_scan));
+    cout << "PASS: deleteTable(" << t1_scan << ")" << endl;
 
     // }}}
 
@@ -1835,7 +1839,7 @@ void rmTest()
 
     // manual tests.
     //rmTest_TupleMgmt(rm);
-    //rmTest_Scan(rm);
+    rmTest_Scan(rm);
 }
 
 int main(int argc, char **argv)
