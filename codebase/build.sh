@@ -1,8 +1,11 @@
 #!/bin/sh
 
 NEWROOT=project1-14
-cd pf; make clean; cd ..
-cd rm; make clean; cd ..
+
+git clean -f
+
+cd pf; gmake clean; cd ..
+cd rm; gmake clean; cd ..
 
 rm -rf "$NEWROOT"
 rm $NEWROOT.zip
