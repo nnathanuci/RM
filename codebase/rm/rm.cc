@@ -1195,10 +1195,6 @@ uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) //
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
-    {
-        if(tableName == system_catalog_tablename)
-            cout << "inserting into sys cat." << endl;
-    }
     uint16_t record_length;
     unsigned int page_id;
 
