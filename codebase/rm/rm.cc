@@ -674,7 +674,9 @@ RC RM::deleteTableAttributes(const string &tableName) // {{{
         /* attributes retrieved from scan, kept for debugging purposes. */
         vector<Attribute> attrs;
 
-        /* RID is unused. */
+        /* RIDs are first stored, and then a mass deletion is performed. Scanning and deleting is tricky. */
+        vector<RID> rids;
+
         RID aux;
 
         /* auxillary attribute. */
@@ -713,9 +715,8 @@ RC RM::deleteTableAttributes(const string &tableName) // {{{
 
             syscat_tuple_to_attr(return_tuple, aux_attr, aux_attr_pos);
 
-            /* delete the tuple from the system catalogue. */
-            if(deleteTuple(system_catalog_tablename, aux))
-                return -1;
+            /* copy the rid for later deletion. */
+            rids.push_back(aux);
 
             attrs.push_back(aux_attr);
 
@@ -726,12 +727,13 @@ RC RM::deleteTableAttributes(const string &tableName) // {{{
 
         rmsi.close();
   
-        /* if no attributes then the table doesn't exist. */
-        if(attrs.size() == 0)
-            return 1;
-
         /* erase the table in cache. */
         catalog.erase(tableName);
+
+        /* delete all the records. */
+        for (unsigned int i = 0; i < rids.size(); i++)
+            if (deleteTuple(system_catalog_tablename, rids[i]))
+                return -1;
 
         /* all attributes are removed from cache. */
         return 0;
@@ -2887,7 +2889,7 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
       
     /* bring in the page. */ 
     if (handle.ReadPage(page_id, raw_page))
-        return 1;
+        return -1;
 
     if(slot_id == 0 && (RM::Instance())->debug)
         RM::debug_data_page(raw_page, "scanning data page (cond)");
@@ -2913,13 +2915,6 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
                 /* work on the next slot next time the iterator is called. */
                 slot_id++;
 
-                if (slot_id == num_slots)
-                {
-                    /* make sure we skip control pages/select only the next data page. */
-                    page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
-                    slot_id = num_slots = 0;
-                }
-
                 return 0;
             }
         }
@@ -2940,7 +2935,7 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
 
             /* bring in the new page. */ 
             if (handle.ReadPage(page_id, raw_page))
-                return 1;
+                return -1;
 
             if((RM::Instance())->debug)
                 RM::debug_data_page(raw_page, "scanning data page");
@@ -2976,7 +2971,7 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
       
     /* bring in the page. */ 
     if (handle.ReadPage(page_id, raw_page))
-        return 1;
+        return -1;
 
     if(slot_id == 0 && (RM::Instance())->debug)
         RM::debug_data_page(raw_page, "scanning data page");
@@ -3002,13 +2997,6 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
             /* work on the next slot next time the iterator is called. */
             slot_id++;
 
-            if (slot_id == num_slots)
-            {
-                /* make sure we skip control pages/select only the next data page. */
-                page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
-                slot_id = num_slots = 0;
-            }
-
             return 0;
         }
 
@@ -3028,7 +3016,7 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
 
             /* bring in the new page. */ 
             if (handle.ReadPage(page_id, raw_page))
-                return 1;
+                return -1;
 
             if((RM::Instance())->debug)
                 RM::debug_data_page(raw_page, "scanning data page");

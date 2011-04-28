@@ -241,6 +241,11 @@ public:
   RC deleteTable(const string tableName);
 
   RC insertTableAttributes(const string &tableName, const vector<Attribute> &attrs);
+
+  /* removes entries from the cache. */
+  RC clearTableAttributes(const string &tableName);
+
+  /* removes entries from the cache and deletes it from the system catalogue. */
   RC deleteTableAttributes(const string &tableName);
 
   RC getAttributes(const string tableName, vector<Attribute> &attrs);
