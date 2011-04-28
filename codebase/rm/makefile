@@ -1,10 +1,7 @@
 
 include ../makefile.inc
 
-all: tags librm.a rmtest test_tuple rmtest_p14 rmtest_extra
-
-tags: *.h *.cc
-	-@rm tags
+all: librm.a rmtest rmtest_p14 rmtest_extra
 
 # lib file dependencies
 librm.a: librm.a(rm.o)  # and possibly other .o files
@@ -19,9 +16,6 @@ rmtest: rmtest.o librm.a $(CODEROOT)/pf/libpf.a
 # binary dependencies
 rmtest_extra: rmtest_extra.o librm.a $(CODEROOT)/pf/libpf.a
 	$(CC) -g3 -o rmtest_extra rmtest_extra.cc librm.a $(CODEROOT)/pf/libpf.a
-
-test_tuple: test_tuple.cc rm.h librm.a $(CODEROOT)/pf/libpf.a
-	$(CC) -g3 -o test_tuple test_tuple.cc librm.a $(CODEROOT)/pf/libpf.a
 
 rmtest_p14: rmtest_p14.cc rm.h librm.a $(CODEROOT)/pf/libpf.a
 	$(CC) -g3 -o rmtest_p14 rmtest_p14.cc librm.a $(CODEROOT)/pf/libpf.a
