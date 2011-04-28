@@ -391,6 +391,11 @@ RC RM::closeTable(const string tableName) // {{{
         if (handle.CloseFile())
             return -1;
 
+        /* delete the attributes for the table. */
+
+        if(deleteTableAttributes(tableName))
+            return -1;
+
         /* delete the entry from the map. */
         open_tables.erase(tableName);
 
@@ -581,29 +586,86 @@ RC RM::insertTableAttributes(const string &tableName, const vector<Attribute> &a
 
     return 0;
 } // }}}
-//
-//RC RM::deleteTableAttributes(const string &tableName, const vector<Attribute> &attrs) // {{{
-//{
-//    /* pack each attribute record in tuple. */
-//    uint8_t tuple[PF_PAGE_SIZE];
-//
-//    /* add fields to the system catalogue. */
-//    for (unsigned int i = 0; i < attrs.size(); i++)
-//    {
-//        /* rid can be thrown away after insert. */
-//        RID aux;
-//
-//        /* populates the tuple preparing it for insertTuple. */
-//        syscat_attr_to_tuple(tuple, tableName, attrs[i], i);
-//
-//        /* insert the tuple. */
-//        if(insertTuple(system_catalog_tablename, tuple, aux))
-//            return -1;
-//    }
-//
-//    return 0;
-//} // }}}
-//
+
+RC RM::deleteTableAttributes(const string &tableName) // {{{
+{
+    /* find fields in system catalogue for deletion in the system catalogue. */
+    if(catalog.count(tableName))
+    {
+        /* retrieve the tuples, and then delete the record based on the RID. */
+        uint8_t return_tuple[PF_PAGE_SIZE];
+        uint8_t value[PF_PAGE_SIZE];
+
+        /* attributes retrieved from scan, kept for debugging purposes. */
+        vector<Attribute> attrs;
+
+        /* RID is unused. */
+        RID aux;
+
+        /* auxillary attribute. */
+        Attribute aux_attr;
+        int aux_attr_pos;
+
+        /* to check for errors. */
+        RC next_tuple_rc;
+
+        int tableName_length = tableName.size();
+
+        /* prepare comparison value buffer to be the tablename. */
+        memcpy(value, &tableName_length, sizeof(tableName_length));
+        memcpy(value + sizeof(tableName_length), tableName.c_str(), tableName_length);
+
+        /* set up iterator, comparing on the table name. */
+        RM_ScanIterator rmsi;
+
+        vector<string> attributes;
+        attributes.push_back("table");
+        attributes.push_back("attribute");
+        attributes.push_back("type");
+        attributes.push_back("length");
+        attributes.push_back("position");
+
+        /* scan the system catalogue, using the table field. */
+        if(scan(system_catalog_tablename, "table", EQ_OP, &value, attributes, rmsi))
+            return -1;
+
+        /* scan retrieving each attribute that matches our tablename. */
+        while((next_tuple_rc = rmsi.getNextTuple(aux, return_tuple)) != RM_EOF)
+        {
+            /* special error code. */
+            if(next_tuple_rc == 1)
+                return -1;
+
+            syscat_tuple_to_attr(return_tuple, aux_attr, aux_attr_pos);
+
+            /* delete the tuple from the system catalogue. */
+            if(deleteTuple(system_catalog_tablename, aux))
+                return -1;
+
+            attrs.push_back(aux_attr);
+
+            /* erase the attribute in cache. */
+            catalog_fields.erase(tableName+"."+aux_attr.name);
+            catalog_fields_position.erase(tableName+"."+aux_attr.name);
+        }
+
+        rmsi.close();
+  
+        /* if no attributes then the table doesn't exist. */
+        if(attrs.size() == 0)
+            return 1;
+
+        /* erase the table in cache. */
+        catalog.erase(tableName);
+
+        /* all attributes are removed from cache. */
+        return 0;
+    }
+
+    /* table doesn't exist, no attributes to delete. */
+    return 0;
+} // }}}
+
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 {
     /* table doesnt exists, fetch the attributes. */
@@ -660,7 +722,6 @@ RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 
         rmsi.close();
   
-        cout << "total attributes: " << attrs.size() << endl;
         /* if no attributes then the table doesn't exist. */
         if(attrs.size() == 0)
             return 1;
@@ -706,29 +767,24 @@ RC RM::getTableAttribute(const string tableName, const string attributeName, Att
 
 RC RM::deleteTable(const string tableName) // {{{
 {
-    vector<Attribute> attrs;
+    //vector<Attribute> attrs;
 
     /* cannot delete the system catalogue. */
     if (tableName == system_catalog_tablename)
         return -1;
 
-    /* table doesnt exists. */
-    if (!catalog.count(tableName))
-        return -1;
+    ///* retrieve table attributes. */
+    //if (getAttributes(tableName, attrs))
+    //    return -1;
 
-    /* retrieve table attributes. */
-    if (getAttributes(tableName, attrs))
-        return -1;
+    //for (unsigned int i = 0; i < attrs.size(); i++)
+    //{
+    //    catalog_fields.erase(tableName+"."+attrs[i].name);
+    //    catalog_fields_position.erase(tableName+"."+attrs[i].name);
+    //}
 
-    /* delete all fields from catalog_fields. */
-    for (unsigned int i = 0; i < attrs.size(); i++)
-    {
-        catalog_fields.erase(tableName+"."+attrs[i].name);
-        catalog_fields_position.erase(tableName+"."+attrs[i].name);
-    }
-
-    /* delete table. */
-    catalog.erase(tableName);
+    ///* delete table. */
+    //catalog.erase(tableName);
 
     if (closeTable(tableName))
         return -1;

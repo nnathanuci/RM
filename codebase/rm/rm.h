@@ -240,11 +240,12 @@ public:
 
   RC deleteTable(const string tableName);
 
-  RC setAttributes(const string tableName, vector<Attribute> &attrs);
+  RC insertTableAttributes(const string &tableName, const vector<Attribute> &attrs);
+  RC deleteTableAttributes(const string &tableName);
 
   RC getAttributes(const string tableName, vector<Attribute> &attrs);
 
-  RC getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition);
+  RC getTableAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition);
 
   //  Format of the data passed into the function is the following:
   //  1) data is a concatenation of values of the attributes
@@ -330,6 +331,8 @@ public:
   static void tuple_to_record(const void *tuple, uint8_t *record, const vector<Attribute> &attrs);
   static void record_to_tuple(uint8_t *record, const void *tuple, const vector<Attribute> &attrs);
   static void record_attr_to_tuple(uint8_t *record, const void *tuple, const Attribute &attr, uint16_t attr_position);
+  static void syscat_attr_to_tuple(const void *tuple, const string tableName, const Attribute &attr, int attr_position);
+  static void syscat_tuple_to_attr(const void *tuple, Attribute &attr, int &attr_pos);
 
   bool debug;
 
