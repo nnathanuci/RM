@@ -1195,6 +1195,10 @@ uint16_t RM::deactivateSlot(uint16_t *slot_page, uint16_t deactivate_slot_id) //
 
 RC RM::insertTuple(const string tableName, const void *data, RID &rid) // {{{
 {
+    {
+        if(tableName == system_catalog_tablename)
+            cout << "inserting into sys cat." << endl;
+    }
     uint16_t record_length;
     unsigned int page_id;
 
@@ -2897,6 +2901,25 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
     /* update the slot count. */
     num_slots = SLOT_GET_NUM_SLOTS(slot_page);
 
+    if (slot_id == num_slots)
+    {
+        /* make sure we skip control pages/select only the next data page. */
+        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+        slot_id = num_slots = 0;
+
+        /* confirm that it's in bounds. */
+        if(page_id >= n_pages)
+            return RM_EOF;
+
+        /* bring in the new page. */ 
+        if (handle.ReadPage(page_id, raw_page))
+            return -1;
+
+        if((RM::Instance())->debug)
+            RM::debug_data_page(raw_page, "scanning data page");
+        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    }
+
     /* find first active slot, get the record offset. */
     while(slot_id < num_slots)
     {
@@ -2978,6 +3001,25 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
 
     /* update the slot count. */
     num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    if (slot_id == num_slots)
+    {
+        /* make sure we skip control pages/select only the next data page. */
+        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+        slot_id = num_slots = 0;
+
+        /* confirm that it's in bounds. */
+        if(page_id >= n_pages)
+            return RM_EOF;
+
+        /* bring in the new page. */ 
+        if (handle.ReadPage(page_id, raw_page))
+            return -1;
+
+        if((RM::Instance())->debug)
+            RM::debug_data_page(raw_page, "scanning data page");
+        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    }
 
     /* find first active slot, get the record offset. */
     while(slot_id < num_slots)
