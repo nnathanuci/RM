@@ -42,19 +42,19 @@ RM::RM()
         attr.length = (AttrLength) MAX_CAT_NAME_LEN;
         system_catalog_attrs.push_back(attr);
 
-        attr.name = "position";
-        attr.type = TypeInt;
-        attr.length = sizeof(unsigned int);
-        system_catalog_attrs.push_back(attr);
-
         attr.name = "type";
         attr.type = TypeInt;
-        attr.length = sizeof(unsigned int);
+        attr.length = sizeof(int);
         system_catalog_attrs.push_back(attr);
 
         attr.name = "length";
         attr.type = TypeInt;
-        attr.length = sizeof(unsigned int);
+        attr.length = sizeof(int);
+        system_catalog_attrs.push_back(attr);
+
+        attr.name = "position";
+        attr.type = TypeInt;
+        attr.length = sizeof(int);
         system_catalog_attrs.push_back(attr);
 
         system_catalog_tablename = SYSTEM_CAT_TABLENAME;
@@ -391,6 +391,10 @@ RC RM::closeTable(const string tableName) // {{{
         if (handle.CloseFile())
             return -1;
 
+        /* delete the attributes for the table. */
+        if(clearTableAttributes(tableName))
+            return -1;
+
         /* delete the entry from the map. */
         open_tables.erase(tableName);
 
@@ -463,18 +467,26 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
     if (catalog.count(tableName))
         return -1;
 
-    /* create table. */
-    catalog[tableName] = attrs;
-
     /* populate the attributes in the system catalog table. */
-    //setAttributes(tableName, attrs);
+    insertTableAttributes(tableName, attrs);
 
-    /* add fields for quick lookup (table.fieldname) */
-    for (unsigned int i = 0; i < attrs.size(); i++)
-    {
-        catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
-        catalog_fields_position[tableName+"."+attrs[i].name] = i;
-    }
+    // not anymore, we're bootstrapping from the system catalogue from now on.
+    /* create table. */
+    //catalog[tableName] = attrs;
+
+    ///* add fields for quick lookup (table.fieldname) */
+    //for (unsigned int i = 0; i < attrs.size(); i++)
+    //{
+    //    catalog_fields[tableName+"."+attrs[i].name] = attrs[i];
+    //    catalog_fields_position[tableName+"."+attrs[i].name] = i;
+    //}
+
+    ///* create the cache using getAttributes */
+    //{
+    //    vector<Attribute> aux_attrs;
+    //    if(getAttributes(tableName, aux_attrs))
+    //        return 1;
+    //}
 
     /* create file & append a control page. */
     if (pf->CreateFile(tableName.c_str()))
@@ -483,34 +495,339 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
     return 0;
 } // }}}
 
-RC RM::setAttributes(const string tableName, vector<Attribute> &attrs) // {{{
+void RM::syscat_attr_to_tuple(const void *tuple, const string tableName, const Attribute &attr, int attr_pos) // {{{
 {
-    // XXX: fetch attributes. 
-    /* table doesnt exists. */
-    if (!catalog.count(tableName))
-        return -1;
+    uint8_t *tuple_ptr = (uint8_t *) tuple;
+    int length;
 
-    attrs = catalog[tableName];
+    /* pack in table name length. */
+    length = tableName.size();
+    memcpy(tuple_ptr, &length, sizeof(length));
+    tuple_ptr += sizeof(length);
+
+    /* pack in the table name. */
+    memcpy(tuple_ptr, tableName.c_str(), tableName.size());
+    tuple_ptr += length;
+
+    /* pack in attribute name length. */
+    length = attr.name.size();
+    memcpy(tuple_ptr, &length, sizeof(length));
+    tuple_ptr += sizeof(length);
+
+    /* pack in the attribute name length. */
+    memcpy(tuple_ptr, attr.name.c_str(), attr.name.size());
+    tuple_ptr += length;
+
+    /* pack in the attribute type. */
+    memcpy(tuple_ptr, &attr.type, sizeof(int));
+    tuple_ptr += sizeof(attr.type);
+
+    /* pack in the attribute length. */
+    memcpy(tuple_ptr, &attr.length, sizeof(int));
+    tuple_ptr += sizeof(attr.length);
+
+    /* pack in the attribute position. */
+    memcpy(tuple_ptr, &attr_pos, sizeof(int));
+    tuple_ptr += sizeof(attr_pos);
+} // }}}
+
+void RM::syscat_tuple_to_attr(const void *tuple, Attribute &attr, int &attr_pos) // {{{
+{
+        uint8_t attr_name[MAX_CAT_NAME_LEN];
+        uint8_t *tuple_ptr = (uint8_t *) tuple;
+        int length;
+
+        /* we can ignore the table name, since our equality gave us this. */
+        memcpy(&length, tuple_ptr, sizeof(length));
+        tuple_ptr += sizeof(length) + length;
+       
+        /* get attribute name, first copy the name length, copy the data to temp buffer, fix it up, assign to string. */
+        memcpy(&length, tuple_ptr, sizeof(length));
+        memcpy(attr_name, tuple_ptr + sizeof(length), length);
+        /* nil terminate so we can copy to a string. */
+        attr_name[length] = '\0';
+        attr.name = (char *) attr_name;
+        tuple_ptr += sizeof(length) + length;
+        
+        /* read in the type info. */
+        memcpy(&attr.type, tuple_ptr, sizeof(int));
+        tuple_ptr += sizeof(int);
+
+        /* read in the length info. */
+        memcpy(&attr.length, tuple_ptr, sizeof(int));
+        tuple_ptr += sizeof(int);
+
+        /* read in the position info. */
+        memcpy(&attr_pos, tuple_ptr, sizeof(int));
+        tuple_ptr += sizeof(int);
+
+        /* we're done. */
+} // }}}
+
+RC RM::insertTableAttributes(const string &tableName, const vector<Attribute> &attrs) // {{{
+{
+    /* pack each attribute record in tuple. */
+    uint8_t tuple[PF_PAGE_SIZE];
+
+    /* add fields to the system catalogue. */
+    for (unsigned int i = 0; i < attrs.size(); i++)
+    {
+        /* rid can be thrown away after insert. */
+        RID aux;
+
+        /* populates the tuple preparing it for insertTuple. */
+        syscat_attr_to_tuple(tuple, tableName, attrs[i], i);
+
+        /* insert the tuple. */
+        if(insertTuple(system_catalog_tablename, tuple, aux))
+            return -1;
+    }
 
     return 0;
-}
+} // }}}
+
+/* deletes from the cache. */
+RC RM::clearTableAttributes(const string &tableName) // {{{
+{
+    /* find fields in system catalogue for deletion in the system catalogue. */
+    if(catalog.count(tableName))
+    {
+        /* retrieve the tuples, and then delete the record based on the RID. */
+        uint8_t return_tuple[PF_PAGE_SIZE];
+        uint8_t value[PF_PAGE_SIZE];
+
+        /* attributes retrieved from scan, kept for debugging purposes. */
+        vector<Attribute> attrs;
+
+        /* RID is unused. */
+        RID aux;
+
+        /* auxillary attribute. */
+        Attribute aux_attr;
+        int aux_attr_pos;
+
+        /* to check for errors. */
+        RC next_tuple_rc;
+
+        int tableName_length = tableName.size();
+
+        /* prepare comparison value buffer to be the tablename. */
+        memcpy(value, &tableName_length, sizeof(tableName_length));
+        memcpy(value + sizeof(tableName_length), tableName.c_str(), tableName_length);
+
+        /* set up iterator, comparing on the table name. */
+        RM_ScanIterator rmsi;
+
+        vector<string> attributes;
+        attributes.push_back("table");
+        attributes.push_back("attribute");
+        attributes.push_back("type");
+        attributes.push_back("length");
+        attributes.push_back("position");
+
+        /* scan the system catalogue, using the table field. */
+        if(scan(system_catalog_tablename, "table", EQ_OP, &value, attributes, rmsi))
+            return -1;
+
+        /* scan retrieving each attribute that matches our tablename. */
+        while((next_tuple_rc = rmsi.getNextTuple(aux, return_tuple)) != RM_EOF)
+        {
+            /* special error code. */
+            if(next_tuple_rc == 1)
+                return -1;
+
+            syscat_tuple_to_attr(return_tuple, aux_attr, aux_attr_pos);
+
+            attrs.push_back(aux_attr);
+
+            /* erase the attribute in cache. */
+            catalog_fields.erase(tableName+"."+aux_attr.name);
+            catalog_fields_position.erase(tableName+"."+aux_attr.name);
+        }
+
+        rmsi.close();
+  
+        /* if no attributes then the table doesn't exist. */
+        if(attrs.size() == 0)
+            return 1;
+
+        /* erase the table in cache. */
+        catalog.erase(tableName);
+
+        /* all attributes are removed from cache. */
+        return 0;
+    }
+
+    /* table doesn't exist, no attributes to delete. */
+    return 0;
+} // }}}
+
+RC RM::deleteTableAttributes(const string &tableName) // {{{
+{
+    /* find fields in system catalogue for deletion in the system catalogue. */
+    if(catalog.count(tableName))
+    {
+        /* retrieve the tuples, and then delete the record based on the RID. */
+        uint8_t return_tuple[PF_PAGE_SIZE];
+        uint8_t value[PF_PAGE_SIZE];
+
+        /* attributes retrieved from scan, kept for debugging purposes. */
+        vector<Attribute> attrs;
+
+        /* RIDs are first stored, and then a mass deletion is performed. Scanning and deleting is tricky. */
+        vector<RID> rids;
+
+        RID aux;
+
+        /* auxillary attribute. */
+        Attribute aux_attr;
+        int aux_attr_pos;
+
+        /* to check for errors. */
+        RC next_tuple_rc;
+
+        int tableName_length = tableName.size();
+
+        /* prepare comparison value buffer to be the tablename. */
+        memcpy(value, &tableName_length, sizeof(tableName_length));
+        memcpy(value + sizeof(tableName_length), tableName.c_str(), tableName_length);
+
+        /* set up iterator, comparing on the table name. */
+        RM_ScanIterator rmsi;
+
+        vector<string> attributes;
+        attributes.push_back("table");
+        attributes.push_back("attribute");
+        attributes.push_back("type");
+        attributes.push_back("length");
+        attributes.push_back("position");
+
+        /* scan the system catalogue, using the table field. */
+        if(scan(system_catalog_tablename, "table", EQ_OP, &value, attributes, rmsi))
+            return -1;
+
+        /* scan retrieving each attribute that matches our tablename. */
+        while((next_tuple_rc = rmsi.getNextTuple(aux, return_tuple)) != RM_EOF)
+        {
+            /* special error code. */
+            if(next_tuple_rc == 1)
+                return -1;
+
+            syscat_tuple_to_attr(return_tuple, aux_attr, aux_attr_pos);
+
+            /* copy the rid for later deletion. */
+            rids.push_back(aux);
+
+            attrs.push_back(aux_attr);
+
+            /* erase the attribute in cache. */
+            catalog_fields.erase(tableName+"."+aux_attr.name);
+            catalog_fields_position.erase(tableName+"."+aux_attr.name);
+        }
+
+        rmsi.close();
+  
+        /* erase the table in cache. */
+        catalog.erase(tableName);
+
+        /* delete all the records. */
+        for (unsigned int i = 0; i < rids.size(); i++)
+            if (deleteTuple(system_catalog_tablename, rids[i]))
+                return -1;
+
+        /* all attributes are removed from cache. */
+        return 0;
+    }
+
+    /* table doesn't exist, no attributes to delete. */
+    return 0;
+} // }}}
+
 RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 {
-    // XXX: fetch attributes. 
-    /* table doesnt exists. */
+    /* table doesnt exists, fetch the attributes. */
     if (!catalog.count(tableName))
-        return -1;
+    {
+        uint8_t return_tuple[PF_PAGE_SIZE];
+        uint8_t value[PF_PAGE_SIZE];
 
+        /* RID is unused. */
+        RID aux;
+
+        /* auxillary attribute. */
+        Attribute aux_attr;
+        int aux_attr_pos;
+
+        /* to check for errors. */
+        RC next_tuple_rc;
+
+        int tableName_length = tableName.size();
+
+        /* prepare comparison value buffer to be the tablename. */
+        memcpy(value, &tableName_length, sizeof(tableName_length));
+        memcpy(value + sizeof(tableName_length), tableName.c_str(), tableName_length);
+
+        /* set up iterator, comparing on the table name. */
+        RM_ScanIterator rmsi;
+
+        vector<string> attributes;
+        attributes.push_back("table");
+        attributes.push_back("attribute");
+        attributes.push_back("type");
+        attributes.push_back("length");
+        attributes.push_back("position");
+
+        /* scan the system catalogue, using the table field. */
+        if(scan(system_catalog_tablename, "table", EQ_OP, &value, attributes, rmsi))
+            return -1;
+
+        /* scan retrieving each attribute that matches our tablename. */
+        while((next_tuple_rc = rmsi.getNextTuple(aux, return_tuple)) != RM_EOF)
+        {
+            /* special error code. */
+            if(next_tuple_rc == 1)
+                return -1;
+
+            syscat_tuple_to_attr(return_tuple, aux_attr, aux_attr_pos);
+
+            attrs.push_back(aux_attr);
+
+            /* cache the attribute. */
+            catalog_fields[tableName+"."+aux_attr.name] = aux_attr;
+            catalog_fields_position[tableName+"."+aux_attr.name] = aux_attr_pos;
+        }
+
+        rmsi.close();
+  
+        /* if no attributes then the table doesn't exist. */
+        if(attrs.size() == 0)
+            return 1;
+
+        /* create the table in cache. */
+        catalog[tableName] = attrs;  
+
+        /* all attributes are now cached. */
+        return 0;
+    }
+
+    /* pull it from the cache. */
     attrs = catalog[tableName];
 
     return 0;
 } // }}}
 
-RC RM::getAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition) // {{{
+RC RM::getTableAttribute(const string tableName, const string attributeName, Attribute &attr, uint16_t &attrPosition) // {{{
 {
-    /* table doesnt exists. */
+    /* table doesnt exist in cache. */
     if (!catalog.count(tableName))
-        return -1;
+    {
+        /* auxillary structure for getting the attributes. */
+        vector <Attribute> attrs;
+
+        /* fetch all attributes first to cache, and then continue. */
+        if(getAttributes(tableName, attrs))
+            return 1;
+    }
 
     /* check to make sure the attribute name exists. */
     if (!catalog_fields.count(tableName+"."+attributeName))
@@ -527,29 +844,36 @@ RC RM::getAttribute(const string tableName, const string attributeName, Attribut
 
 RC RM::deleteTable(const string tableName) // {{{
 {
-    vector<Attribute> attrs;
+    /* easiest way to delete is to first open the table. */
+    PF_FileHandle handle;
+
+    /* auxillary structure for getting the attributes. */
+    vector <Attribute> attrs;
 
     /* cannot delete the system catalogue. */
     if (tableName == system_catalog_tablename)
         return -1;
 
-    /* table doesnt exists. */
-    if (!catalog.count(tableName))
+    /* open table to get handle. */
+    if (openTable(tableName, handle))
         return -1;
 
     /* retrieve table attributes. */
     if (getAttributes(tableName, attrs))
         return -1;
 
-    /* delete all fields from catalog_fields. */
-    for (unsigned int i = 0; i < attrs.size(); i++)
-    {
-        catalog_fields.erase(tableName+"."+attrs[i].name);
-        catalog_fields_position.erase(tableName+"."+attrs[i].name);
-    }
+    /* delete table attributes. */
+    if (deleteTableAttributes(tableName))
+        return -1;
 
-    /* delete table. */
-    catalog.erase(tableName);
+    //for (unsigned int i = 0; i < attrs.size(); i++)
+    //{
+    //    catalog_fields.erase(tableName+"."+attrs[i].name);
+    //    catalog_fields_position.erase(tableName+"."+attrs[i].name);
+    //}
+
+    ///* delete table. */
+    //catalog.erase(tableName);
 
     if (closeTable(tableName))
         return -1;
@@ -2286,7 +2610,7 @@ RC RM::readAttribute(const string tableName, const RID &rid, const string attrib
     PF_FileHandle handle;
 
     /* retrieve table attributes. */
-    if (getAttribute(tableName, attributeName, attr, attr_position))
+    if (getTableAttribute(tableName, attributeName, attr, attr_position))
         return -1;
 
     /* open table to read in page. */
@@ -2334,7 +2658,7 @@ RC RM::scan(const string tableName, const vector<string> &attributeNames, RM_Sca
         Attribute attr;
         uint16_t attr_pos;
 
-        if (getAttribute(tableName, attributeNames[i], attr, attr_pos))
+        if (getTableAttribute(tableName, attributeNames[i], attr, attr_pos))
             return -1;
 
         attrs.push_back(attr);
@@ -2395,7 +2719,7 @@ RC RM::scan(const string tableName, const string conditionAttribute, const CompO
         Attribute attr;
         uint16_t attr_pos;
 
-        if (getAttribute(tableName, attributeNames[i], attr, attr_pos))
+        if (getTableAttribute(tableName, attributeNames[i], attr, attr_pos))
             return -1;
 
         attrs.push_back(attr);
@@ -2426,7 +2750,7 @@ RC RM::scan(const string tableName, const string conditionAttribute, const CompO
     rm_ScanIterator.value = (void *) value;
 
     /* get the actual attribute. */
-    if (getAttribute(tableName, conditionAttribute, cond_attr, cond_attr_pos))
+    if (getTableAttribute(tableName, conditionAttribute, cond_attr, cond_attr_pos))
         return -1;
 
     rm_ScanIterator.cond_attr = cond_attr;
@@ -2519,6 +2843,7 @@ RC RM_ScanIterator::record_cond_attrs_to_tuple(uint8_t *record, void *data) // {
     {
         int lhs_length, rhs_length, cmp_value;
         memcpy(&lhs_length, tuple_ptr, sizeof(lhs_length));
+        tuple_ptr += sizeof(lhs_length);
         memcpy(&rhs_length, value, sizeof(rhs_length));
 
         /* if the lengths don't match and we're testing for equality we immediately know this isn't equal. */
@@ -2571,6 +2896,25 @@ RC RM_ScanIterator::getNextTupleCond(RID &rid, void *data) // {{{
 
     /* update the slot count. */
     num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    if (slot_id == num_slots)
+    {
+        /* make sure we skip control pages/select only the next data page. */
+        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+        slot_id = num_slots = 0;
+
+        /* confirm that it's in bounds. */
+        if(page_id >= n_pages)
+            return RM_EOF;
+
+        /* bring in the new page. */ 
+        if (handle.ReadPage(page_id, raw_page))
+            return -1;
+
+        if((RM::Instance())->debug)
+            RM::debug_data_page(raw_page, "scanning data page");
+        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    }
 
     /* find first active slot, get the record offset. */
     while(slot_id < num_slots)
@@ -2653,6 +2997,25 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) // {{{
 
     /* update the slot count. */
     num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+
+    if (slot_id == num_slots)
+    {
+        /* make sure we skip control pages/select only the next data page. */
+        page_id = CTRL_IS_CTRL_PAGE(page_id + 1) ? page_id + 2 : page_id + 1;
+        slot_id = num_slots = 0;
+
+        /* confirm that it's in bounds. */
+        if(page_id >= n_pages)
+            return RM_EOF;
+
+        /* bring in the new page. */ 
+        if (handle.ReadPage(page_id, raw_page))
+            return -1;
+
+        if((RM::Instance())->debug)
+            RM::debug_data_page(raw_page, "scanning data page");
+        num_slots = SLOT_GET_NUM_SLOTS(slot_page);
+    }
 
     /* find first active slot, get the record offset. */
     while(slot_id < num_slots)
