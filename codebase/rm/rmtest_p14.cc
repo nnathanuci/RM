@@ -1830,12 +1830,12 @@ void rmTest()
 
     // write your own testing cases here
     cout << "System Catalogue (createTable, deleteTable, getAttributes) tests: " << endl << endl;
-    //rmTest_SystemCatalog(rm);
-    //rmTest_PageMgmt(rm);
+    rmTest_SystemCatalog(rm);
+    rmTest_PageMgmt(rm);
 
     // manual tests.
     //rmTest_TupleMgmt(rm);
-    rmTest_Scan(rm);
+    //rmTest_Scan(rm);
 }
 
 int main(int argc, char **argv)
