@@ -430,6 +430,9 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
     /* Handle used to write control page. */
     PF_FileHandle handle;
 
+    /* auxillary attributes to check if the table exists in the catalog. */
+    vector<Attribute> aux_attrs;
+
     /* check table name. */
     if (tableName.find_first_of("/.") != string::npos)
         return -1;
@@ -465,6 +468,12 @@ RC RM::createTable(const string tableName, const vector<Attribute> &attrs) // {{
 
     /* table exists. */
     if (catalog.count(tableName))
+        return -1;
+
+    /* check to see if any attributes are available given the table.
+       a very rare circumstance when the return code is overloaded to distinguish that there's no attributes for this table.
+    */
+    if(getAttributes(tableName, aux_attrs) != 1)
         return -1;
 
     /* populate the attributes in the system catalog table. */
@@ -799,7 +808,7 @@ RC RM::getAttributes(const string tableName, vector<Attribute> &attrs) // {{{
 
         rmsi.close();
   
-        /* if no attributes then the table doesn't exist. */
+        /* if no attributes then the table doesn't exist, return 1 to indicate this. */
         if(attrs.size() == 0)
             return 1;
 
